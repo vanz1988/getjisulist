@@ -65,13 +65,12 @@ def send_telegram(message, screenshot_path=None):
         return
     tz_offset = timezone(timedelta(hours=8))
     time_str = datetime.now(tz_offset).strftime("%Y-%m-%d %H:%M:%S") + " HKT"
-    full_message = f"🎉 抓取通知\n\n抓取时间：{time_str}\n\n{message}"
+    full_message = f"🎉 短剧 \n\n：{time_str}\n\n{message}"
     try:
         if screenshot_path and os.path.exists(screenshot_path):
             url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendPhoto"
             with open(screenshot_path, 'rb') as photo:
-                requests.post(url, data={"chat_id": TELEGRAM_CHAT_ID, "caption": full_message},
-                              files={'photo': photo}, timeout=20)
+                requests.post(url, data={"chat_id": TELEGRAM_CHAT_ID, "caption": full_message}, files={'photo': photo}, timeout=20)
         else:
             url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
             requests.post(url, data={"chat_id": TELEGRAM_CHAT_ID, "text": full_message}, timeout=10)
