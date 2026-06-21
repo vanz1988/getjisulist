@@ -391,6 +391,9 @@ def main():
     spider = JisuSpider(target_actors=target_actors, page_urls=page_urls)
     success, msg = spider.run()
 
+
+    logger.info("\n{msg}")
+
     send_telegram(msg, spider.screenshot_path)
 
     # 成功后清理错误截图
