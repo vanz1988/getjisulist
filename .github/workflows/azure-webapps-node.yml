@@ -15,6 +15,7 @@ jobs:
       TARGET_ACTORS: ${{ secrets.TARGET_ACTORS }}
       PAGE_URLS: ${{ secrets.PAGE_URLS }}
       TURNSTILE_URL: ${{ secrets.TURNSTILE_URL }}
+      HOST_URL: ${{ secrets.HOST_URL }}
 
     steps:
       - name: Checkout repository
