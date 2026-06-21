@@ -28,7 +28,7 @@ HEADLESS = os.getenv('HEADLESS', 'true').lower() == 'true'
 TELEGRAM_BOT_TOKEN = os.getenv('BOT_TOKEN', '')
 TELEGRAM_CHAT_ID = os.getenv('CHAT_ID', '')
 PROXY_SERVER = os.getenv('HTTP_PROXY', '')
-# 抓取目标：演员列表与列表页（逗号/分号分隔，留空则用默认值）
+# 抓取目标：IActors列表与列表页（逗号/分号分隔，留空则用默认值）
 TARGET_ACTORS_ENV = os.getenv('TARGET_ACTORS', '')
 PAGE_URLS_ENV = os.getenv('PAGE_URLS', '')
 # 打码入口 URL（用于过 CF 拿 cookie）
@@ -270,12 +270,12 @@ class JisuSpider:
             all_lis = soup.find_all('li')
             for li in all_lis:
                 text = li.get_text()
-                if '主演：' in text:
-                    actors_text = text.split('主演：')[-1].strip()
+                if 'IActors：' in text:
+                    actors_text = text.split('IActors：')[-1].strip()
                     actors = actors_text
                     break
             if not actors:
-                actors_match = re.search(r'主演：<span>(.*?)</span>', html)
+                actors_match = re.search(r'IActors：<span>(.*?)</span>', html)
                 if actors_match:
                     actors = actors_match.group(1)
 
@@ -286,10 +286,10 @@ class JisuSpider:
             if self.target_actors:
                 matched = any(actor in actors for actor in self.target_actors)
                 if not matched:
-                    logger.info(f"跳过 {title}，主演 {actors} 不包含目标演员")
+                    logger.info(f"跳过 {title}，IActors {actors} 不包含目标IActors")
                     return None
 
-            logger.info(f"成功抓取: {title} - 主演: {actors}")
+            logger.info(f"成功抓取: {title} - IActors: {actors}")
             return {'title': title, 'actors': actors, 'url': detail_url}
 
         except Exception as e:
@@ -298,7 +298,7 @@ class JisuSpider:
 
     # ---------- 核心抓取流程 ----------
     def process(self):
-        logger.info(f"🚀 开始抓取，列表页 {len(self.page_urls)} 个，目标演员 {len(self.target_actors)} 个")
+        logger.info(f"🚀 开始抓取，列表页 {len(self.page_urls)} 个，目标IActors {len(self.target_actors)} 个")
 
         if not self.driver:
             self.setup_driver()
@@ -328,7 +328,7 @@ class JisuSpider:
 
         summary = f"📊 抓取完成！共 {len(all_dramas)} 部\n\n"
         for i, drama in enumerate(all_dramas, 1):
-            summary += f"{i}. {drama['title']} | 主演: {drama['actors']} | {drama['url']}\n"
+            summary += f"{i}. {drama['title']} | IActors: {drama['actors']} | {drama['url']}\n"
 
         logger.info("\n" + "=" * 50)
         logger.info(f"抓取完成！共 {len(all_dramas)} 部")
