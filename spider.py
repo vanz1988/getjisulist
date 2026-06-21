@@ -391,7 +391,7 @@ def main():
     success, msg = spider.run()
 
 
-    logger.info("\n{msg}")
+    logger.info(f"汇总:\n {msg}")
 
     send_telegram(msg, spider.screenshot_path)
 
