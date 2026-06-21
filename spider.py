@@ -271,11 +271,11 @@ class JisuSpider:
             for li in all_lis:
                 text = li.get_text()
                 if 'IActors：' in text:
-                    actors_text = text.split('IActors：')[-1].strip()
+                    actors_text = text.split('主演：')[-1].strip()
                     actors = actors_text
                     break
             if not actors:
-                actors_match = re.search(r'IActors：<span>(.*?)</span>', html)
+                actors_match = re.search(r'主演：<span>(.*?)</span>', html)
                 if actors_match:
                     actors = actors_match.group(1)
 
