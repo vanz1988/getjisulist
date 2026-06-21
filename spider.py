@@ -33,6 +33,7 @@ TARGET_ACTORS_ENV = os.getenv('TARGET_ACTORS', '')
 PAGE_URLS_ENV = os.getenv('PAGE_URLS', '')
 # 打码入口 URL（用于过 CF 拿 cookie）
 TURNSTILE_URL = os.getenv('TURNSTILE_URL', 'https://www.ji.com')
+HOST_URL = os.getenv('HOST_URL', 'https://www.ji.com')
 
 # ===================== 工具函数 =====================
 def rand_int(min_val, max_val):
@@ -81,7 +82,7 @@ def send_telegram(message, screenshot_path=None):
 # ===================== 爬虫核心类 =====================
 class JisuSpider:
     def __init__(self, target_actors=None, page_urls=None):
-        self.base_url = "https://www.jisuzy.com"
+        self.base_url = HOST_URL
         self.target_actors = target_actors or []
         self.page_urls = page_urls or []
         self.driver = None
