@@ -318,13 +318,13 @@ class JisuSpider:
 
             for i, detail_url in enumerate(detail_urls):
                 if i > 0:
-                    sleep(500 + random.random() * 1000)
+                    sleep(100)
                 drama_info = self.get_drama_info(detail_url)
                 if drama_info:
                     all_dramas.append(drama_info)
 
             logger.info(f"完成列表页: {page_url}, 累计抓取: {len(all_dramas)} 条数据")
-            sleep(1000 + random.random() * 1000)
+            sleep(1000)
 
         summary = f"📊 抓取完成！共 {len(all_dramas)} 部\n\n"
         for i, drama in enumerate(all_dramas, 1):
