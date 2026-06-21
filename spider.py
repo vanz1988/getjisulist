@@ -6,6 +6,7 @@ import logging
 import random
 import re
 import requests
+import base64
 import undetected_chromedriver as uc
 from datetime import datetime, timezone, timedelta
 from bs4 import BeautifulSoup
@@ -33,7 +34,8 @@ TARGET_ACTORS_ENV = os.getenv('TARGET_ACTORS', '')
 PAGE_URLS_ENV = os.getenv('PAGE_URLS', '')
 # 打码入口 URL（用于过 CF 拿 cookie）
 TURNSTILE_URL = os.getenv('TURNSTILE_URL', 'https://www.ji.com')
-HOST_URL = os.getenv('HOST_URL', 'https://www.ji.com')
+encoded_url = os.getenv('HOST_URL', 'aHR0cHM6Ly93d3cuamkuY29t')
+HOST_URL = base64.b64decode(encoded_url).decode('utf-8')
 
 # ===================== 工具函数 =====================
 def rand_int(min_val, max_val):
