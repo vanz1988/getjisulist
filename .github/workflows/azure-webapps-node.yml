@@ -56,13 +56,13 @@ jobs:
         run: |
           python spider.py
 
-      - name: Delete old runs with API
+      - name: Keep only last 8 runs total
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          # 获取所有运行记录
-          curl -L -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/${{ github.repository }}/actions/runs?per_page=100" \
-            | jq -r '.workflow_runs[8:][] | .id' \
-            | while read id; do
-              curl -X DELETE -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-                "https://api.github.com/repos/${{ github.repository }}/actions/runs/$id"
-            done
+          # 获取所有 runs，按时间倒序，跳过前 8 条，删除后面的
+          gh api repos/${{ github.repository }}/actions/runs --paginate \
+            --jq '.workflow_runs | sort_by(.created_at) | reverse | .[8:][] | .id' \
+            | xargs -I {} gh api -X DELETE repos/${{ github.repository }}/actions/runs/{} --silent
+          
+          echo "✓ Kept latest 8 runs across all workflows"
