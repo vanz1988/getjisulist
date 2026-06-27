@@ -12,6 +12,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    env:
+      BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+      CHAT_ID: ${{ secrets.CHAT_ID }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -25,6 +29,7 @@ jobs:
           set -e
           chmod +x CloudflareST
           pip install pandas
+          pip install python-dotenv
 
       - name: 测速
         run: |
