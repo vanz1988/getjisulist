@@ -94,20 +94,30 @@ class JisuSpider:
     # ---------- 浏览器初始化 ----------
     def setup_driver(self):
         chrome_options = Options()
-        if HEADLESS: chrome_options.add_argument('--headless')
+        if HEADLESS: 
+            chrome_options.add_argument('--headless=new')
         chrome_options.add_argument('--no-sandbox')
         chrome_options.add_argument('--disable-dev-shm-usage')
         chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+        chrome_options.add_argument('--window-size=1280,720')
+        
         if PROXY_SERVER:
             chrome_options.add_argument(f'--proxy-server={PROXY_SERVER}')
-        v_env = os.getenv('CHROME_VERSION', '')
-        v_main = int(v_env) if v_env.isdigit() else None
-        logger.info(f"🛠️ 驱动初始化 - 指定大版本: {v_main or '自动探测'}")
+        
+        logger.info(f"🛠️  - 驱动初始化")
+
         try:
-            self.driver = uc.Chrome(options=chrome_options, headless=HEADLESS, version_main=v_main, use_subprocess=True)
+            # 不指定版本，让它自动匹配系统 Chrome
+            self.driver = uc.Chrome(
+                options=chrome_options,
+                headless=HEADLESS,
+                use_subprocess=True,
+                version_main=148  # 自动检测
+            )
+            logger.info(f"- 驱动启动成功")
         except Exception as e:
-            logger.warning(f"⚠️ 强制版本启动失败，尝试降级启动: {e}")
-            self.driver = uc.Chrome(options=chrome_options, headless=HEADLESS)
+            logger.error(f"- 驱动启动失败: {e}")
+            raise
         self.driver.set_window_size(1280, 720)
 
     # ---------- Cloudflare Turnstile 验证（Katabump 框架化方案）----------
