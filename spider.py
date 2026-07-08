@@ -25,7 +25,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # ===================== 全局配置 =====================
-HEADLESS = os.getenv('HEADLESS', 'true').lower() == 'true'
+HEADLESS = os.getenv('HEADLESS', 'false').lower() == 'true'
 TELEGRAM_BOT_TOKEN = os.getenv('BOT_TOKEN', '')
 TELEGRAM_CHAT_ID = os.getenv('CHAT_ID', '')
 PROXY_SERVER = os.getenv('HTTP_PROXY', '')
