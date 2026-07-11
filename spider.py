@@ -442,7 +442,6 @@ class JisuSpider:
 
         # 过 CF 拿 cookie，构建 requests 会话
         if not self._pass_turnstile(TURNSTILE_URL):
-            self.driver.get("https://api.ip.sb/ip")
             return False, "❌ Cloudflare 打码失败"
 
         # 打码完成后关闭浏览器，后续用 requests 跑
