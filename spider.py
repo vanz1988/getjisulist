@@ -100,6 +100,8 @@ class JisuSpider:
         chrome_options.add_argument('--disable-dev-shm-usage')
         chrome_options.add_argument('--disable-blink-features=AutomationControlled')
         chrome_options.add_argument('--window-size=1280,720')
+        chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        chrome_options.add_experimental_option("useAutomationExtension", False)
         
         if PROXY_SERVER:
             chrome_options.add_argument(f'--proxy-server={PROXY_SERVER}')
@@ -120,6 +122,9 @@ class JisuSpider:
             logger.error(f"- 驱动启动失败: {e}")
             raise
         self.driver.set_window_size(1280, 720)
+        self.driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
+            "source": "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
+        })
 
     # ---------- Cloudflare Turnstile 验证（Katabump 框架化方案）----------
     def _handle_turnstile(self, context=""):
