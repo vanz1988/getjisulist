@@ -6,6 +6,7 @@ import logging
 import random
 import re
 import math
+import subprocess
 import requests
 import base64
 import undetected_chromedriver as uc
@@ -15,7 +16,6 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.action_chains import ActionChains
 from selenium.common.exceptions import TimeoutException, WebDriverException
 from dotenv import load_dotenv
 
@@ -145,6 +145,48 @@ def _bezier_points(start_x, start_y, end_x, end_y, steps=25):
         points.append((round(x), round(y)))
     return points
 
+def _activate_window():
+    for cls in ["chrome", "chromium", "Chromium", "Chrome", "google-chrome"]:
+        try:
+            r = subprocess.run(["xdotool", "search", "--onlyvisible", "--class", cls],
+                               capture_output=True, text=True, timeout=3)
+            wids = [w for w in r.stdout.strip().split("\n") if w.strip()]
+            if wids:
+                subprocess.run(["xdotool", "windowactivate", "--sync", wids[0]],
+                               timeout=3, stderr=subprocess.DEVNULL)
+                time.sleep(0.2)
+                return
+        except Exception:
+            pass
+
+def _xdotool_click(x: int, y: int):
+    _activate_window()
+    try:
+        subprocess.run(["xdotool", "mousemove", "--sync", str(x), str(y)],
+                       timeout=3, stderr=subprocess.DEVNULL)
+        time.sleep(random.uniform(0.08, 0.2))
+        subprocess.run(["xdotool", "click", "1"],
+                       timeout=2, stderr=subprocess.DEVNULL)
+    except Exception:
+        os.system(f"xdotool mousemove {x} {y} click 1 2>/dev/null")
+
+def _xdotool_move_and_click(start_x, start_y, end_x, end_y):
+    _activate_window()
+    points = _bezier_points(start_x, start_y, end_x, end_y, steps=random.randint(15, 25))
+    for px, py in points:
+        try:
+            subprocess.run(["xdotool", "mousemove", str(px), str(py)],
+                           timeout=1, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
+        time.sleep(random.uniform(0.005, 0.02))
+    time.sleep(random.uniform(0.1, 0.25))
+    try:
+        subprocess.run(["xdotool", "click", "1"],
+                       timeout=2, stderr=subprocess.DEVNULL)
+    except Exception:
+        os.system(f"xdotool click 1 2>/dev/null")
+
 def human_type(driver, selector_type, selector_value, text):
     try:
         element = WebDriverWait(driver, 15).until(
@@ -213,9 +255,8 @@ class JisuSpider:
             self.driver = uc.Chrome(
                 options=chrome_options,
                 headless=HEADLESS,
-                use_subprocess=True,
-                version_main=148,
-                browser_executable_path="/opt/hostedtoolcache/setup-chrome/chromium/148.0.7778.178/x64/chrome"
+                use_subprocess=True
+
             )
             logger.info(f"- 驱动启动成功")
         except Exception as e:
@@ -228,9 +269,8 @@ class JisuSpider:
 
     # ---------- Cloudflare Turnstile 验证（Katabump 框架化方案）----------
     def _handle_turnstile(self, context=""):
-        """优化后的 Cloudflare 验证逻辑"""
+        """使用 xdotool 物理级点击通过 Cloudflare Turnstile"""
         try:
-
             container = WebDriverWait(self.driver, 15).until(
                 EC.visibility_of_element_located(
                     (By.XPATH, "//div[contains(@style, 'display: grid') and .//input[@name='cf-turnstile-response']]")
@@ -241,53 +281,42 @@ class JisuSpider:
 
             size = container.size
             base_offset_x = -(size['width'] / 2) + (size['width'] * 0.044)
-            target_offset_x = base_offset_x + random.uniform(-5, 5)
-            target_offset_y = random.uniform(-5, 5)
+            offset_x = base_offset_x + random.uniform(-5, 5)
+            offset_y = random.uniform(-5, 5)
 
             logger.info(f"🖱️ - [{context}] 找到窗口")
 
-            self.driver.execute_script("arguments[0].focus();", container)
+            rect = self.driver.execute_script("""
+                var rect = arguments[0].getBoundingClientRect();
+                return {left: rect.left, top: rect.top, width: rect.width, height: rect.height};
+            """, container)
 
+            click_x = rect['left'] + rect['width'] / 2 + offset_x
+            click_y = rect['top'] + rect['height'] / 2 + offset_y
+
+            win_info = self.driver.execute_script("""
+                return {
+                    sx: window.screenX || 0,
+                    sy: window.screenY || 0,
+                    oh: window.outerHeight,
+                    ih: window.innerHeight
+                };
+            """)
+            bar = win_info['oh'] - win_info['ih']
+            screen_x = round(click_x + win_info['sx'])
+            screen_y = round(click_y + win_info['sy'] + bar)
+
+            self.driver.execute_script("arguments[0].focus();", container)
             sleep(random.randint(500, 1200))
 
-            logger.info(f"🖱️ - [{context}] 开始鼠标轨迹移动")
+            logger.info(f"🖱️ - [{context}] 开始 xdotool 物理点击")
 
-            actions = ActionChains(self.driver)
-            actions.move_to_element(container)
-            actions.pause(random.uniform(0.2, 0.5))
+            start_x = screen_x + random.randint(-80, -20)
+            start_y = screen_y + random.randint(-40, 40)
+            _xdotool_move_and_click(start_x, start_y, screen_x, screen_y)
 
-            wobble_steps = random.randint(3, 6)
-            for _ in range(wobble_steps):
-                wx = random.uniform(-8, 8)
-                wy = random.uniform(-8, 8)
-                actions.move_by_offset(wx, wy)
-                actions.pause(random.uniform(0.03, 0.08))
+            logger.info(f"🖱️ - [{context}] 执行物理点击...screen=({screen_x},{screen_y})")
 
-            cur_offset_x = sum(random.uniform(-8, 8) for _ in range(wobble_steps))
-            cur_offset_y = sum(random.uniform(-8, 8) for _ in range(wobble_steps))
-
-            dx = target_offset_x - cur_offset_x
-            dy = target_offset_y - cur_offset_y
-            steps_to_target = random.randint(4, 8)
-            step_dx = dx / steps_to_target
-            step_dy = dy / steps_to_target
-            for i in range(steps_to_target):
-                noise_x = random.uniform(-2, 2) if i < steps_to_target - 1 else 0
-                noise_y = random.uniform(-2, 2) if i < steps_to_target - 1 else 0
-                actions.move_by_offset(step_dx + noise_x, step_dy + noise_y)
-                actions.pause(random.uniform(0.02, 0.06))
-
-            logger.info(f"🖱️ - [{context}] 焦点马上点击")
-
-            actions.click_and_hold()
-            actions.pause(random.uniform(0.08, 0.18))
-            actions.release()
-            actions.perform() 
-            
-            click_x = round(target_offset_x, 1)
-            click_y = round(target_offset_y, 1)
-            logger.info(f"🖱️ - [{context}] 执行偏移点击...offset=({click_x},{click_y})")
-            
             validated = False
             return validated
         except Exception as e:
