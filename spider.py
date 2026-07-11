@@ -230,8 +230,8 @@ def handle_turnstile(sb) -> bool:
 
 #  账户登录
 def login(sb) -> bool:
-    print(f"🌐 打开登录页面: {BASE_URL}/auth/login")
-    sb.uc_open_with_reconnect(BASE_URL + "/auth/login", reconnect_time=8)
+    print(f"🌐 打开登录页面: {TURNSTILE_URL}/auth/login")
+    sb.uc_open_with_reconnect(TURNSTILE_URL, reconnect_time=8)
     time.sleep(6)
 
     # 先等待 Cloudflare 验证通过（最多等 30 秒）
