@@ -112,7 +112,8 @@ class JisuSpider:
                 options=chrome_options,
                 headless=HEADLESS,
                 use_subprocess=True,
-                version_main=148
+                version_main=148,
+                browser_executable_path="/opt/hostedtoolcache/setup-chrome/chromium/148.0.7778.178/x64/chrome"
             )
             logger.info(f"- 驱动启动成功")
         except Exception as e:
