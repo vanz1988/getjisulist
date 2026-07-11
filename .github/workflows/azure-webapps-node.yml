@@ -44,15 +44,12 @@ jobs:
         run: |
           bash <(wget -qO- https://main.ssss.nyc.mn/setup_proxy.sh) 
 
-      - name: Start X Virtual Frame Buffer (Xvfb)
-        run: Xvfb :99 -ac -screen 0 1280x720x24 &
-
-      - name: Run Script in Stealth Mode (via Xvfb)
+      - name: 🚀 运行续期脚本
         env:
-          DISPLAY: ':99'
           HEADLESS: 'false'
         run: |
-          python spider.py
+          xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" \
+            spider.py
 
       - name: Keep only last 8 runs total
         env:
