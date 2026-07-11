@@ -29,6 +29,11 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          
+      - name: Install Chrome 148
+        uses: browser-actions/setup-chrome@v1
+        with:
+          chrome-version: 148
 
       - name: Install dependencies
         run: |
