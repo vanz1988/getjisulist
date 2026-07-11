@@ -206,9 +206,7 @@ class JisuSpider:
         if PROXY_SERVER:
             chrome_options.add_argument(f'--proxy-server={PROXY_SERVER}')
         
-        chrome_options.add_experimental_option('excludeSwitches', ['enable-automation', 'enable-logging'])
-        chrome_options.add_experimental_option('useAutomationExtension', False)
-        
+
         logger.info(f"🛠️  - 驱动初始化")
 
         try:
@@ -442,6 +440,7 @@ class JisuSpider:
 
         # 过 CF 拿 cookie，构建 requests 会话
         if not self._pass_turnstile(TURNSTILE_URL):
+            self.driver.get("https://api.ip.sb/ip")
             return False, "❌ Cloudflare 打码失败"
 
         # 打码完成后关闭浏览器，后续用 requests 跑
