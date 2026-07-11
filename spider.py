@@ -5,6 +5,7 @@ import time
 import logging
 import random
 import re
+import math
 import requests
 import base64
 import undetected_chromedriver as uc
@@ -37,6 +38,84 @@ TURNSTILE_URL = os.getenv('TURNSTILE_URL', 'https://www.ji.com')
 encoded_url = os.getenv('HOST_URL', 'aHR0cHM6Ly93d3cuamkuY29t')
 HOST_URL = base64.b64decode(encoded_url).decode('utf-8')
 
+# ===================== 反检测 JS 注入脚本 =====================
+STEALTH_JS = """
+// webdriver
+Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+
+// plugins
+Object.defineProperty(navigator, 'plugins', {
+    get: () => [1, 2, 3, 4, 5],
+});
+
+// languages
+Object.defineProperty(navigator, 'languages', {
+    get: () => ['zh-CN', 'zh', 'en-US', 'en'],
+});
+
+// Chrome runtime
+window.chrome = { runtime: {}, loadTimes: function(){}, csi: function(){}, app: {} };
+
+// Permissions
+const originalQuery = window.navigator.permissions.query;
+window.navigator.permissions.query = (parameters) => (
+    parameters.name === 'notifications' ?
+        Promise.resolve({ state: Notification.permission }) :
+        originalQuery(parameters)
+);
+
+// WebGL - override getParameter to hide SwiftShader
+const getParameter = WebGLRenderingContext.prototype.getParameter;
+WebGLRenderingContext.prototype.getParameter = function(param) {
+    if (param === 37445) return 'Intel Inc.';
+    if (param === 37446) return 'Intel Iris OpenGL Engine';
+    return getParameter.call(this, param);
+};
+const getParameter2 = WebGL2RenderingContext.prototype.getParameter;
+WebGL2RenderingContext.prototype.getParameter = function(param) {
+    if (param === 37445) return 'Intel Inc.';
+    if (param === 37446) return 'Intel Iris OpenGL Engine';
+    return getParameter2.call(this, param);
+};
+
+// Canvas fingerprint noise
+const originalToDataURL = HTMLCanvasElement.prototype.toDataURL;
+HTMLCanvasElement.prototype.toDataURL = function(type) {
+    if (this.width === 220 && this.height === 30) {
+        return originalToDataURL.apply(this, arguments);
+    }
+    const ctx = this.getContext('2d');
+    if (ctx) {
+        const imageData = ctx.getImageData(0, 0, this.width, this.height);
+        for (let i = 0; i < imageData.data.length; i += 4) {
+            imageData.data[i] += Math.floor(Math.random() * 3) - 1;
+        }
+        ctx.putImageData(imageData, 0, 0);
+    }
+    return originalToDataURL.apply(this, arguments);
+};
+
+// navigator.hardwareConcurrency
+Object.defineProperty(navigator, 'hardwareConcurrency', {get: () => 8});
+
+// navigator.deviceMemory
+Object.defineProperty(navigator, 'deviceMemory', {get: () => 8});
+
+// iframe contentWindow
+const originalContentWindow = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'contentWindow');
+Object.defineProperty(HTMLIFrameElement.prototype, 'contentWindow', {
+    get: function() {
+        const result = originalContentWindow.get.call(this);
+        if (result) {
+            try {
+                Object.defineProperty(result.navigator, 'webdriver', {get: () => undefined});
+            } catch(e) {}
+        }
+        return result;
+    }
+});
+"""
+
 # ===================== 工具函数 =====================
 def rand_int(min_val, max_val):
     return random.randint(min_val, max_val)
@@ -47,6 +126,24 @@ def sleep(ms):
 def human_delay():
     delay = 7000 + random.random() * 5000
     sleep(delay)
+
+def _bezier_points(start_x, start_y, end_x, end_y, steps=25):
+    ctrl1_x = start_x + (end_x - start_x) * random.uniform(0.2, 0.4) + random.uniform(-30, 30)
+    ctrl1_y = start_y + (end_y - start_y) * random.uniform(0.2, 0.4) + random.uniform(-30, 30)
+    ctrl2_x = start_x + (end_x - start_x) * random.uniform(0.5, 0.8) + random.uniform(-20, 20)
+    ctrl2_y = start_y + (end_y - start_y) * random.uniform(0.5, 0.8) + random.uniform(-20, 20)
+    points = []
+    for i in range(steps + 1):
+        t = i / steps
+        t2 = t * t
+        t3 = t2 * t
+        mt = 1 - t
+        mt2 = mt * mt
+        mt3 = mt2 * mt
+        x = mt3 * start_x + 3 * mt2 * t * ctrl1_x + 3 * mt * t2 * ctrl2_x + t3 * end_x
+        y = mt3 * start_y + 3 * mt2 * t * ctrl1_y + 3 * mt * t2 * ctrl2_y + t3 * end_y
+        points.append((round(x), round(y)))
+    return points
 
 def human_type(driver, selector_type, selector_value, text):
     try:
@@ -99,14 +196,22 @@ class JisuSpider:
         chrome_options.add_argument('--no-sandbox')
         chrome_options.add_argument('--disable-dev-shm-usage')
         chrome_options.add_argument('--window-size=1280,720')
+        chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+        chrome_options.add_argument('--disable-features=IsolateOrigins,site-per-process')
+        chrome_options.add_argument('--disable-infobars')
+        chrome_options.add_argument('--disable-browser-side-navigation')
+        chrome_options.add_argument('--lang=zh-CN')
+        chrome_options.add_argument('--accept-lang=zh-CN,zh,en-US,en')
         
         if PROXY_SERVER:
             chrome_options.add_argument(f'--proxy-server={PROXY_SERVER}')
         
+        chrome_options.add_experimental_option('excludeSwitches', ['enable-automation', 'enable-logging'])
+        chrome_options.add_experimental_option('useAutomationExtension', False)
+        
         logger.info(f"🛠️  - 驱动初始化")
 
         try:
-            # 不指定版本，让它自动匹配系统 Chrome
             self.driver = uc.Chrome(
                 options=chrome_options,
                 headless=HEADLESS,
@@ -120,7 +225,7 @@ class JisuSpider:
             raise
         self.driver.set_window_size(1280, 720)
         self.driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
-            "source": "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
+            "source": STEALTH_JS
         })
 
     # ---------- Cloudflare Turnstile 验证（Katabump 框架化方案）----------
@@ -157,22 +262,38 @@ class JisuSpider:
 
             self.driver.execute_script("arguments[0].focus();", container)
 
-            sleep(800)
+            sleep(random.randint(500, 1200))
+
+            logger.info(f"🖱️ - [{context}] 开始鼠标轨迹移动")
+
+            start_x = random.randint(100, 300)
+            start_y = random.randint(200, 400)
+            points = _bezier_points(start_x, start_y, click_x, click_y, steps=random.randint(18, 30))
+
+            actions = ActionChains(self.driver)
+            actions.move_by_offset(-start_x, -start_y)
+            actions.move_by_offset(start_x, start_y)
+            actions.pause(random.uniform(0.15, 0.3))
+
+            prev_x, prev_y = start_x, start_y
+            for px, py in points[1:]:
+                dx = px - prev_x
+                dy = py - prev_y
+                if dx == 0 and dy == 0:
+                    continue
+                actions.move_by_offset(dx, dy)
+                actions.pause(random.uniform(0.008, 0.025))
+                prev_x, prev_y = px, py
 
             logger.info(f"🖱️ - [{context}] 焦点马上点击")
 
-            actions = ActionChains(self.driver)
-            actions.move_to_element(container)
-            actions.pause(random.uniform(0.5, 0.8))
-            actions.move_to_element_with_offset(container, rand_x, rand_y)
             actions.click_and_hold()
-            actions.pause(random.uniform(0.1, 0.25))
+            actions.pause(random.uniform(0.08, 0.18))
             actions.release()
             actions.perform() 
             
             logger.info(f"🖱️ - [{context}] 执行偏移点击...{click_x},{click_y}")
             
-            # 轮询检查 Token
             validated = False
             return validated
         except Exception as e:
