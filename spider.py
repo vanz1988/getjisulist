@@ -111,7 +111,8 @@ class JisuSpider:
             self.driver = uc.Chrome(
                 options=chrome_options,
                 headless=HEADLESS,
-                use_subprocess=True
+                use_subprocess=True,
+                version_main=148
             )
             logger.info(f"- 驱动启动成功")
         except Exception as e:
