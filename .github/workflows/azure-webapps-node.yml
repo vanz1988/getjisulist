@@ -38,7 +38,10 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
-          sudo apt-get update && sudo apt-get install -y xvfb
+          sudo apt-get update && sudo apt-get install -y xvfb pulseaudio
+          # 虚拟音频，让浏览器认为有声卡
+          pulseaudio --start --fail=false --daemonize=false &
+          sleep 1
 
       - name: ⚙ 设置代理 (sing-box)
         continue-on-error: true
@@ -62,8 +65,7 @@ jobs:
           echo "CHROME_VERSION=$CHROME_VERSION" >> $GITHUB_ENV
 
       - name: Start X Virtual Frame Buffer (Xvfb)
-        # 在后台启动 Xvfb，创建一个虚拟屏幕 :99
-        run: Xvfb :99 -ac &
+        run: Xvfb :99 -ac -screen 0 1280x720x24 &
 
       - name: Run Script in Stealth Mode (via Xvfb)
         env:
