@@ -2,8 +2,8 @@ name: Auto spider list
 
 on:  
   schedule:
-    - cron: '11 2 */1 * *'  # 每4天运行一次（UTC时间 03:17）
-  workflow_dispatch:  # 允许手动触发
+    - cron: '11 2 */1 * *'
+  workflow_dispatch:
 
 permissions:
   actions: write
@@ -29,17 +29,11 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          
-      - name: Install Chrome 148
-        uses: browser-actions/setup-chrome@v1
-        with:
-          chrome-version: 148
 
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
           sudo apt-get update && sudo apt-get install -y xvfb xdotool pulseaudio
-          # 虚拟音频，让浏览器认为有声卡
           pulseaudio --start --fail=false --daemonize=false &
           sleep 1
 
@@ -49,20 +43,6 @@ jobs:
           NODE_LINK: ${{ secrets.NODE_LINK }}
         run: |
           bash <(wget -qO- https://main.ssss.nyc.mn/setup_proxy.sh) 
-          
-      - name: Get Chromium Version
-        id: get_version
-        run: |
-          CHROME_VERSION=$(chromium-browser --version 2>/dev/null | grep -oE 'Chromium\s[0-9]+' | grep -oE '[0-9]+')
-          if [ -z "$CHROME_VERSION" ]; then
-            CHROME_VERSION=$(google-chrome --version 2>/dev/null | grep -oE 'Chrome\s[0-9]+' | grep -oE '[0-9]+')
-          fi
-          if [ -z "$CHROME_VERSION" ]; then
-            echo "⚠️ 无法自动检测浏览器版本，使用最新稳定版本。"
-          CHROME_VERSION="144"
-          fi
-          echo "Detected Chrome/Chromium Major Version: $CHROME_VERSION"
-          echo "CHROME_VERSION=$CHROME_VERSION" >> $GITHUB_ENV
 
       - name: Start X Virtual Frame Buffer (Xvfb)
         run: Xvfb :99 -ac -screen 0 1280x720x24 &
@@ -78,7 +58,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # 获取所有 runs，按时间倒序，跳过前 8 条，删除后面的
           gh api repos/${{ github.repository }}/actions/runs --paginate \
             --jq '.workflow_runs | sort_by(.created_at) | reverse | .[8:][] | .id' \
             | xargs -I {} gh api -X DELETE repos/${{ github.repository }}/actions/runs/{} --silent
