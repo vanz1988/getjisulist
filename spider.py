@@ -5,146 +5,73 @@ import time
 import logging
 import random
 import re
-import math
 import subprocess
 import requests
 import base64
-import undetected_chromedriver as uc
 from datetime import datetime, timezone, timedelta
 from bs4 import BeautifulSoup
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.options import Options
-from selenium.common.exceptions import TimeoutException, WebDriverException
+from seleniumbase import SB
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# ===================== 配置日志 =====================
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# ===================== 全局配置 =====================
 HEADLESS = os.getenv('HEADLESS', 'true').lower() == 'true'
 TELEGRAM_BOT_TOKEN = os.getenv('BOT_TOKEN', '')
 TELEGRAM_CHAT_ID = os.getenv('CHAT_ID', '')
 PROXY_SERVER = os.getenv('HTTP_PROXY', '')
-# 抓取目标：IActors列表与列表页（逗号/分号分隔，留空则用默认值）
 TARGET_ACTORS_ENV = os.getenv('TARGET_ACTORS', '')
 PAGE_URLS_ENV = os.getenv('PAGE_URLS', '')
-# 打码入口 URL（用于过 CF 拿 cookie）
 TURNSTILE_URL = os.getenv('TURNSTILE_URL', 'https://www.ji.com')
 encoded_url = os.getenv('HOST_URL', 'aHR0cHM6Ly93d3cuamkuY29t')
 HOST_URL = base64.b64decode(encoded_url).decode('utf-8')
 
-# ===================== 反检测 JS 注入脚本 =====================
-STEALTH_JS = """
-// webdriver
-Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
-
-// plugins
-Object.defineProperty(navigator, 'plugins', {
-    get: () => [1, 2, 3, 4, 5],
-});
-
-// languages
-Object.defineProperty(navigator, 'languages', {
-    get: () => ['zh-CN', 'zh', 'en-US', 'en'],
-});
-
-// Chrome runtime
-window.chrome = { runtime: {}, loadTimes: function(){}, csi: function(){}, app: {} };
-
-// Permissions
-const originalQuery = window.navigator.permissions.query;
-window.navigator.permissions.query = (parameters) => (
-    parameters.name === 'notifications' ?
-        Promise.resolve({ state: Notification.permission }) :
-        originalQuery(parameters)
-);
-
-// WebGL - override getParameter to hide SwiftShader
-const getParameter = WebGLRenderingContext.prototype.getParameter;
-WebGLRenderingContext.prototype.getParameter = function(param) {
-    if (param === 37445) return 'Intel Inc.';
-    if (param === 37446) return 'Intel Iris OpenGL Engine';
-    return getParameter.call(this, param);
-};
-const getParameter2 = WebGL2RenderingContext.prototype.getParameter;
-WebGL2RenderingContext.prototype.getParameter = function(param) {
-    if (param === 37445) return 'Intel Inc.';
-    if (param === 37446) return 'Intel Iris OpenGL Engine';
-    return getParameter2.call(this, param);
-};
-
-// Canvas fingerprint noise
-const originalToDataURL = HTMLCanvasElement.prototype.toDataURL;
-HTMLCanvasElement.prototype.toDataURL = function(type) {
-    if (this.width === 220 && this.height === 30) {
-        return originalToDataURL.apply(this, arguments);
+# ===================== Turnstile JS =====================
+_EXPAND_JS = """
+(function() {
+    var ts = document.querySelector('input[name="cf-turnstile-response"]');
+    if (!ts) return 'no-turnstile';
+    var el = ts;
+    for (var i = 0; i < 20; i++) {
+        el = el.parentElement;
+        if (!el) break;
+        var s = window.getComputedStyle(el);
+        if (s.overflow === 'hidden' || s.overflowX === 'hidden' || s.overflowY === 'hidden')
+            el.style.overflow = 'visible';
+        el.style.minWidth = 'max-content';
     }
-    const ctx = this.getContext('2d');
-    if (ctx) {
-        const imageData = ctx.getImageData(0, 0, this.width, this.height);
-        for (let i = 0; i < imageData.data.length; i += 4) {
-            imageData.data[i] += Math.floor(Math.random() * 3) - 1;
+    document.querySelectorAll('iframe').forEach(function(f){
+        if (f.src && f.src.includes('challenges.cloudflare.com')) {
+            f.style.width = '300px'; f.style.height = '65px';
+            f.style.minWidth = '300px';
+            f.style.visibility = 'visible'; f.style.opacity = '1';
         }
-        ctx.putImageData(imageData, 0, 0);
-    }
-    return originalToDataURL.apply(this, arguments);
-};
-
-// navigator.hardwareConcurrency
-Object.defineProperty(navigator, 'hardwareConcurrency', {get: () => 8});
-
-// navigator.deviceMemory
-Object.defineProperty(navigator, 'deviceMemory', {get: () => 8});
-
-// iframe contentWindow
-const originalContentWindow = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'contentWindow');
-Object.defineProperty(HTMLIFrameElement.prototype, 'contentWindow', {
-    get: function() {
-        const result = originalContentWindow.get.call(this);
-        if (result) {
-            try {
-                Object.defineProperty(result.navigator, 'webdriver', {get: () => undefined});
-            } catch(e) {}
-        }
-        return result;
-    }
-});
+    });
+    return 'done';
+})()
 """
 
-# ===================== 工具函数 =====================
-def rand_int(min_val, max_val):
-    return random.randint(min_val, max_val)
+_SOLVED_JS = """
+(function(){
+    var i = document.querySelector('input[name="cf-turnstile-response"]');
+    return !!(i && i.value && i.value.length > 20);
+})()
+"""
 
-def sleep(ms):
-    time.sleep(ms / 1000)
+_WININFO_JS = """
+(function(){
+    return {
+        sx: window.screenX || 0,
+        sy: window.screenY || 0,
+        oh: window.outerHeight,
+        ih: window.innerHeight
+    };
+})()
+"""
 
-def human_delay():
-    delay = 7000 + random.random() * 5000
-    sleep(delay)
-
-def _bezier_points(start_x, start_y, end_x, end_y, steps=25):
-    ctrl1_x = start_x + (end_x - start_x) * random.uniform(0.2, 0.4) + random.uniform(-30, 30)
-    ctrl1_y = start_y + (end_y - start_y) * random.uniform(0.2, 0.4) + random.uniform(-30, 30)
-    ctrl2_x = start_x + (end_x - start_x) * random.uniform(0.5, 0.8) + random.uniform(-20, 20)
-    ctrl2_y = start_y + (end_y - start_y) * random.uniform(0.5, 0.8) + random.uniform(-20, 20)
-    points = []
-    for i in range(steps + 1):
-        t = i / steps
-        t2 = t * t
-        t3 = t2 * t
-        mt = 1 - t
-        mt2 = mt * mt
-        mt3 = mt2 * mt
-        x = mt3 * start_x + 3 * mt2 * t * ctrl1_x + 3 * mt * t2 * ctrl2_x + t3 * end_x
-        y = mt3 * start_y + 3 * mt2 * t * ctrl1_y + 3 * mt * t2 * ctrl2_y + t3 * end_y
-        points.append((round(x), round(y)))
-    return points
-
+# ===================== xdotool 工具 =====================
 def _activate_window():
     for cls in ["chrome", "chromium", "Chromium", "Chrome", "google-chrome"]:
         try:
@@ -170,38 +97,7 @@ def _xdotool_click(x: int, y: int):
     except Exception:
         os.system(f"xdotool mousemove {x} {y} click 1 2>/dev/null")
 
-def _xdotool_move_and_click(start_x, start_y, end_x, end_y):
-    _activate_window()
-    points = _bezier_points(start_x, start_y, end_x, end_y, steps=random.randint(15, 25))
-    for px, py in points:
-        try:
-            subprocess.run(["xdotool", "mousemove", str(px), str(py)],
-                           timeout=1, stderr=subprocess.DEVNULL)
-        except Exception:
-            pass
-        time.sleep(random.uniform(0.005, 0.02))
-    time.sleep(random.uniform(0.1, 0.25))
-    try:
-        subprocess.run(["xdotool", "click", "1"],
-                       timeout=2, stderr=subprocess.DEVNULL)
-    except Exception:
-        os.system(f"xdotool click 1 2>/dev/null")
-
-def human_type(driver, selector_type, selector_value, text):
-    try:
-        element = WebDriverWait(driver, 15).until(
-            EC.visibility_of_element_located((selector_type, selector_value))
-        )
-        element.clear()
-        for char in text:
-            element.send_keys(char)
-            sleep(rand_int(50, 150))
-        return True
-    except Exception as e:
-        logger.warning(f"打字失败: {e}")
-        return False
-
-# ===================== Telegram 通知 =====================
+# ===================== Telegram =====================
 def send_telegram(message, screenshot_path=None):
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         return
@@ -212,7 +108,8 @@ def send_telegram(message, screenshot_path=None):
         if screenshot_path and os.path.exists(screenshot_path):
             url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendPhoto"
             with open(screenshot_path, 'rb') as photo:
-                requests.post(url, data={"chat_id": TELEGRAM_CHAT_ID, "caption": full_message}, files={'photo': photo}, timeout=20)
+                requests.post(url, data={"chat_id": TELEGRAM_CHAT_ID, "caption": full_message},
+                              files={'photo': photo}, timeout=20)
         else:
             url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
             requests.post(url, data={"chat_id": TELEGRAM_CHAT_ID, "text": full_message}, timeout=10)
@@ -220,123 +117,73 @@ def send_telegram(message, screenshot_path=None):
     except Exception as e:
         logger.warning(f"⚠️ Telegram 发送失败: {e}")
 
-# ===================== 爬虫核心类 =====================
+# ===================== Turnstile 处理 =====================
+def handle_turnstile(sb, max_attempts=6):
+    logger.info("🔍 处理 Cloudflare Turnstile 验证...")
+    time.sleep(2)
+
+    if sb.execute_script(_SOLVED_JS):
+        logger.info("✅ 已静默通过")
+        return True
+
+    for _ in range(3):
+        try:
+            sb.execute_script(_EXPAND_JS)
+        except Exception:
+            pass
+        time.sleep(0.5)
+
+    for attempt in range(max_attempts):
+        if sb.execute_script(_SOLVED_JS):
+            logger.info(f"✅ Turnstile 通过（第 {attempt} 次尝试）")
+            return True
+
+        logger.info(f"🖱️ 第 {attempt + 1} 次调用 uc_gui_click_captcha...")
+        try:
+            sb.uc_gui_click_captcha()
+        except Exception as e:
+            logger.warning(f"uc_gui_click_captcha 异常: {e}")
+            try:
+                container = sb.find_element(
+                    "xpath", "//div[contains(@style, 'display: grid') and .//input[@name='cf-turnstile-response']]"
+                )
+                rect = sb.execute_script("""
+                    var rect = arguments[0].getBoundingClientRect();
+                    return {left: rect.left, top: rect.top, width: rect.width, height: rect.height};
+                """, container)
+                win = sb.execute_script(_WININFO_JS)
+                bar = win['oh'] - win['ih']
+                cx = round(rect['left'] + rect['width'] / 2 + win['sx'])
+                cy = round(rect['top'] + rect['height'] / 2 + win['sy'] + bar)
+                logger.info(f"🖱️ 降级 xdotool 点击 ({cx}, {cy})")
+                _xdotool_click(cx, cy)
+            except Exception as e2:
+                logger.warning(f"xdotool 降级也失败: {e2}")
+
+        for _ in range(16):
+            time.sleep(0.5)
+            if sb.execute_script(_SOLVED_JS):
+                logger.info(f"✅ Turnstile 通过（第 {attempt + 1} 次尝试）")
+                return True
+
+        logger.info(f"⚠️ 第 {attempt + 1} 次未通过，重试...")
+
+    logger.warning("❌ Turnstile 多次尝试均失败")
+    return False
+
+# ===================== 核心爬虫 =====================
 class JisuSpider:
     def __init__(self, target_actors=None, page_urls=None):
         self.base_url = HOST_URL
         self.target_actors = target_actors or []
         self.page_urls = page_urls or []
-        self.driver = None
         self.session = None
         self.screenshot_path = None
 
-    # ---------- 浏览器初始化 ----------
-    def setup_driver(self):
-        chrome_options = Options()
-        if HEADLESS: 
-            chrome_options.add_argument('--headless=new')
-        chrome_options.add_argument('--no-sandbox')
-        chrome_options.add_argument('--disable-dev-shm-usage')
-        chrome_options.add_argument('--window-size=1280,720')
-        chrome_options.add_argument('--disable-blink-features=AutomationControlled')
-        chrome_options.add_argument('--disable-features=IsolateOrigins,site-per-process')
-        chrome_options.add_argument('--disable-infobars')
-        chrome_options.add_argument('--disable-browser-side-navigation')
-        chrome_options.add_argument('--lang=zh-CN')
-        chrome_options.add_argument('--accept-lang=zh-CN,zh,en-US,en')
-        
-        if PROXY_SERVER:
-            chrome_options.add_argument(f'--proxy-server={PROXY_SERVER}')
-        
-
-        logger.info(f"🛠️  - 驱动初始化")
-
-        try:
-            self.driver = uc.Chrome(
-                options=chrome_options,
-                headless=HEADLESS,
-                use_subprocess=True
-
-            )
-            logger.info(f"- 驱动启动成功")
-        except Exception as e:
-            logger.error(f"- 驱动启动失败: {e}")
-            raise
-        self.driver.set_window_size(1280, 720)
-        self.driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
-            "source": STEALTH_JS
-        })
-
-    # ---------- Cloudflare Turnstile 验证（Katabump 框架化方案）----------
-    def _handle_turnstile(self, context=""):
-        """使用 xdotool 物理级点击通过 Cloudflare Turnstile"""
-        try:
-            container = WebDriverWait(self.driver, 15).until(
-                EC.visibility_of_element_located(
-                    (By.XPATH, "//div[contains(@style, 'display: grid') and .//input[@name='cf-turnstile-response']]")
-                )
-            )
-
-            logger.info(f"✅  - 找到元素了")
-
-            size = container.size
-            base_offset_x = -(size['width'] / 2) + (size['width'] * 0.044)
-            offset_x = base_offset_x + random.uniform(-5, 5)
-            offset_y = random.uniform(-5, 5)
-
-            logger.info(f"🖱️ - [{context}] 找到窗口")
-
-            rect = self.driver.execute_script("""
-                var rect = arguments[0].getBoundingClientRect();
-                return {left: rect.left, top: rect.top, width: rect.width, height: rect.height};
-            """, container)
-
-            click_x = rect['left'] + rect['width'] / 2 + offset_x
-            click_y = rect['top'] + rect['height'] / 2 + offset_y
-
-            win_info = self.driver.execute_script("""
-                return {
-                    sx: window.screenX || 0,
-                    sy: window.screenY || 0,
-                    oh: window.outerHeight,
-                    ih: window.innerHeight
-                };
-            """)
-            bar = win_info['oh'] - win_info['ih']
-            screen_x = round(click_x + win_info['sx'])
-            screen_y = round(click_y + win_info['sy'] + bar)
-
-            self.driver.execute_script("arguments[0].focus();", container)
-            sleep(random.randint(500, 1200))
-
-            logger.info(f"🖱️ - [{context}] 开始 xdotool 物理点击")
-
-            start_x = screen_x + random.randint(-80, -20)
-            start_y = screen_y + random.randint(-40, 40)
-            _xdotool_move_and_click(start_x, start_y, screen_x, screen_y)
-
-            logger.info(f"🖱️ - [{context}] 执行物理点击...screen=({screen_x},{screen_y})")
-
-            validated = False
-            return validated
-        except Exception as e:
-            logger.error(f"❌  - [{context}] 验证交互失败: {e}")
-            return False
-
-    def _find_optional(self, locator, timeout=5):
-        """查找元素，找不到返回 None 而不抛异常。"""
-        try:
-            return WebDriverWait(self.driver, timeout).until(
-                EC.presence_of_element_located(locator)
-            )
-        except TimeoutException:
-            return None
-
-    # ---------- 通过 turnstile 并构建 requests 会话 ----------
-    def _build_session(self):
-        cookies = self.driver.get_cookies()
-        ua = self.driver.execute_script('return navigator.userAgent')
-
+    def _build_session(self, sb):
+        driver = sb.driver
+        cookies = driver.get_cookies()
+        ua = driver.execute_script('return navigator.userAgent')
         session = requests.Session()
         for c in cookies:
             session.cookies.set(c.get('name', ''), c.get('value', ''))
@@ -347,31 +194,6 @@ class JisuSpider:
         self.session = session
         logger.info(f"已构建 requests 会话，cookies: {len(cookies)} 个")
 
-    def _pass_turnstile(self, url, max_attempts=5):
-        self.driver.get(url)
-        sleep(3000 + random.random() * 1000)
-
-        # 已直接放行则无需打码
-        if self._find_optional((By.CSS_SELECTOR, '.card-content-h1'), timeout=5):
-            logger.info("页面已加载，无需打码")
-            self._build_session()
-            return True
-
-        for i in range(max_attempts):
-            logger.info(f"打码第 {i+1} 次尝试...")
-            self._handle_turnstile(f"PassTurnstile-{i+1}")
-
-            if self._find_optional((By.CSS_SELECTOR, '.card-content-h1'), timeout=8):
-                logger.info("打码成功！")
-                self._build_session()
-                return True
-
-            logger.info(f"第 {i+1} 次打码未通过，重试...")
-
-        logger.warning(f"打码失败，已尝试 {max_attempts} 次")
-        return False
-
-    # ---------- 页面获取 ----------
     def _get_page(self, url, retries=3):
         for attempt in range(retries):
             try:
@@ -379,21 +201,16 @@ class JisuSpider:
                     resp = self.session.get(url, timeout=15)
                     resp.raise_for_status()
                     return resp.text
-                else:
-                    self.driver.get(url)
-                    return self.driver.page_source
             except Exception as e:
                 logger.warning(f"访问失败 {url} (第{attempt+1}次): {e}")
-                sleep(2000)
+                time.sleep(2)
         return None
 
-    # ---------- 解析详情链接 ----------
     def get_detail_urls(self, page_url):
         detail_urls = []
         html = self._get_page(page_url)
         if not html:
             return detail_urls
-
         soup = BeautifulSoup(html, 'html.parser')
         items = soup.find_all('div', class_='list-item')
         for item in items:
@@ -402,17 +219,14 @@ class JisuSpider:
                 href = link_tag['href']
                 full_url = self.base_url + href if href.startswith('/') else href
                 detail_urls.append(full_url)
-
         logger.info(f"从 {page_url} 获取到 {len(detail_urls)} 个详情链接")
         return detail_urls
 
-    # ---------- 解析单部 ----------
     def get_drama_info(self, detail_url):
         try:
             html = self._get_page(detail_url)
             if not html:
                 return None
-
             soup = BeautifulSoup(html, 'html.parser')
 
             title = None
@@ -456,36 +270,44 @@ class JisuSpider:
             logger.warning(f"获取详情页失败 {detail_url}: {e}")
             return None
 
-    # ---------- 核心抓取流程 ----------
-    def process(self):
-        logger.info(f"🚀 开始抓取，列表页 {len(self.page_urls)} 个，目标IActors {len(self.target_actors)} 个")
+    def process(self, sb):
+        sb.uc_open_with_reconnect(TURNSTILE_URL, reconnect_time=8)
+        time.sleep(3 + random.random() * 2)
 
-        if not self.driver:
-            self.setup_driver()
+        passed = False
+        for _ in range(5):
+            try:
+                sb.find_element('.card-content-h1', timeout=5)
+                logger.info("页面已加载，无需打码")
+                passed = True
+                break
+            except Exception:
+                break
 
-        # 过 CF 拿 cookie，构建 requests 会话
-        if not self._pass_turnstile(TURNSTILE_URL):
-            self.driver.get("https://api.ip.sb/ip")
+        if not passed:
+            passed = handle_turnstile(sb)
+
+        if not passed:
+            try:
+                sb.open("https://api.ip.sb/ip")
+            except Exception:
+                pass
             return False, "❌ Cloudflare 打码失败"
 
-        # 打码完成后关闭浏览器，后续用 requests 跑
-        if self.driver:
-            self.driver.quit()
-            self.driver = None
+        self._build_session(sb)
+        logger.info(f"🚀 开始抓取，列表页 {len(self.page_urls)} 个，目标IActors {len(self.target_actors)} 个")
 
         all_dramas = []
         for page_url in self.page_urls:
             detail_urls = self.get_detail_urls(page_url)
-
             for i, detail_url in enumerate(detail_urls):
                 if i > 0:
-                    sleep(100)
+                    time.sleep(0.1)
                 drama_info = self.get_drama_info(detail_url)
                 if drama_info:
                     all_dramas.append(drama_info)
-
             logger.info(f"完成列表页: {page_url}, 累计抓取: {len(all_dramas)} 条数据")
-            sleep(1000)
+            time.sleep(1)
 
         summary = f"📊 抓取完成！共 {len(all_dramas)} 部\n\n"
         for i, drama in enumerate(all_dramas, 1):
@@ -495,41 +317,39 @@ class JisuSpider:
         logger.info(f"抓取完成！共 {len(all_dramas)} 部")
         return True, summary
 
-    # ---------- 带重试与截图的运行入口 ----------
     def run(self, max_retries=3):
         last_error = ""
 
         for attempt in range(max_retries):
+            sb_kwargs = {"uc": True, "headless": HEADLESS}
+            if PROXY_SERVER:
+                sb_kwargs["proxy"] = PROXY_SERVER
+
             try:
-                if not self.driver:
-                    self.setup_driver()
-
-                if attempt > 0:
-                    logger.info(f"🔄 正在进行第 {attempt + 1} 次尝试...")
-
-                success, message = self.process()
-                if success:
-                    return True, message
-                last_error = message
-
-                # 打码失败不重试（重试也是同样的 CF）
-                if "打码失败" in message:
-                    break
-
+                with SB(**sb_kwargs) as sb:
+                    if attempt > 0:
+                        logger.info(f"🔄 正在进行第 {attempt + 1} 次尝试...")
+                    success, message = self.process(sb)
+                    if success:
+                        return True, message
+                    last_error = message
+                    if "打码失败" in message:
+                        break
+                    try:
+                        sb.save_screenshot("error-spider.png")
+                        self.screenshot_path = "error-spider.png"
+                    except Exception:
+                        pass
             except Exception as e:
                 last_error = f"异常：{str(e)[:80]}"
                 logger.error(f"❌ 第 {attempt + 1} 次执行出错: {e}")
+                self.screenshot_path = "error-spider.png"
 
             if attempt < max_retries - 1:
-                sleep(5000 + random.random() * 5000)
+                time.sleep(5 + random.random() * 5)
 
-        # 最终失败处理：截图
-        self.screenshot_path = "error-spider.png"
-        if self.driver:
-            try:
-                self.driver.save_screenshot(self.screenshot_path)
-            except Exception as e:
-                logger.warning(f"截图失败: {e}")
+        if not self.screenshot_path:
+            self.screenshot_path = "error-spider.png"
         return False, f"❌ 历经 {max_retries} 次尝试仍失败: {last_error}"
 
 
@@ -542,8 +362,7 @@ def _parse_list(env_val, default_list, sep=r'[,;\n]'):
 
 def main():
     default_actors = []
-    default_pages = [
-    ]
+    default_pages = []
 
     target_actors = _parse_list(TARGET_ACTORS_ENV, default_actors)
     page_urls = _parse_list(PAGE_URLS_ENV, default_pages)
@@ -551,12 +370,9 @@ def main():
     spider = JisuSpider(target_actors=target_actors, page_urls=page_urls)
     success, msg = spider.run()
 
-
     logger.info(f"汇总:\n {msg}")
-
     send_telegram(msg, spider.screenshot_path)
 
-    # 成功后清理错误截图
     if success and spider.screenshot_path and os.path.exists(spider.screenshot_path):
         try:
             os.remove(spider.screenshot_path)
