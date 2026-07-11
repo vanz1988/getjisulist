@@ -241,22 +241,10 @@ class JisuSpider:
 
             size = container.size
             base_offset_x = -(size['width'] / 2) + (size['width'] * 0.044)
-            rand_x = base_offset_x + random.uniform(-5, 5)
-            rand_y = random.uniform(-5, 5)
+            target_offset_x = base_offset_x + random.uniform(-5, 5)
+            target_offset_y = random.uniform(-5, 5)
 
             logger.info(f"🖱️ - [{context}] 找到窗口")
-
-            rect = self.driver.execute_script("""
-                var rect = arguments[0].getBoundingClientRect();
-                return {left: rect.left, top: rect.top, width: rect.width, height: rect.height};
-            """, container)
-            center_x = rect['left'] + rect['width'] / 2
-            center_y = rect['top'] + rect['height'] / 2
-            click_x = center_x + rand_x
-            click_y = center_y + rand_y
-
-            click_x = round(click_x)
-            click_y = round(click_y)
 
             self.driver.execute_script("arguments[0].focus();", container)
 
@@ -264,24 +252,30 @@ class JisuSpider:
 
             logger.info(f"🖱️ - [{context}] 开始鼠标轨迹移动")
 
-            start_x = random.randint(100, 300)
-            start_y = random.randint(200, 400)
-            points = _bezier_points(start_x, start_y, click_x, click_y, steps=random.randint(18, 30))
-
             actions = ActionChains(self.driver)
-            actions.move_by_offset(-start_x, -start_y)
-            actions.move_by_offset(start_x, start_y)
-            actions.pause(random.uniform(0.15, 0.3))
+            actions.move_to_element(container)
+            actions.pause(random.uniform(0.2, 0.5))
 
-            prev_x, prev_y = start_x, start_y
-            for px, py in points[1:]:
-                dx = px - prev_x
-                dy = py - prev_y
-                if dx == 0 and dy == 0:
-                    continue
-                actions.move_by_offset(dx, dy)
-                actions.pause(random.uniform(0.008, 0.025))
-                prev_x, prev_y = px, py
+            wobble_steps = random.randint(3, 6)
+            for _ in range(wobble_steps):
+                wx = random.uniform(-8, 8)
+                wy = random.uniform(-8, 8)
+                actions.move_by_offset(wx, wy)
+                actions.pause(random.uniform(0.03, 0.08))
+
+            cur_offset_x = sum(random.uniform(-8, 8) for _ in range(wobble_steps))
+            cur_offset_y = sum(random.uniform(-8, 8) for _ in range(wobble_steps))
+
+            dx = target_offset_x - cur_offset_x
+            dy = target_offset_y - cur_offset_y
+            steps_to_target = random.randint(4, 8)
+            step_dx = dx / steps_to_target
+            step_dy = dy / steps_to_target
+            for i in range(steps_to_target):
+                noise_x = random.uniform(-2, 2) if i < steps_to_target - 1 else 0
+                noise_y = random.uniform(-2, 2) if i < steps_to_target - 1 else 0
+                actions.move_by_offset(step_dx + noise_x, step_dy + noise_y)
+                actions.pause(random.uniform(0.02, 0.06))
 
             logger.info(f"🖱️ - [{context}] 焦点马上点击")
 
@@ -290,7 +284,9 @@ class JisuSpider:
             actions.release()
             actions.perform() 
             
-            logger.info(f"🖱️ - [{context}] 执行偏移点击...{click_x},{click_y}")
+            click_x = round(target_offset_x, 1)
+            click_y = round(target_offset_y, 1)
+            logger.info(f"🖱️ - [{context}] 执行偏移点击...offset=({click_x},{click_y})")
             
             validated = False
             return validated
