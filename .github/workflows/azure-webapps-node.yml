@@ -38,7 +38,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
-          sudo apt-get update && sudo apt-get install -y xvfb pulseaudio
+          sudo apt-get update && sudo apt-get install -y xvfb xdotool pulseaudio
           # 虚拟音频，让浏览器认为有声卡
           pulseaudio --start --fail=false --daemonize=false &
           sleep 1
