@@ -31,8 +31,8 @@ BASE_URL = "https://dashboard.katabump.com"  # 网站链接
 
 #  Telegram 推送模块
 def send_tg_message(status_icon, status_text, time_left=""):
-    if not TG_BOT_TOKEN or not TG_CHAT_ID:
-        print("ℹ️ 未配置 TG_BOT_TOKEN 或 TG_CHAT_ID，跳过 Telegram 推送。")
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        print("ℹ️ 未配置 TELEGRAM_BOT_TOKEN 或 TELEGRAM_CHAT_ID，跳过 Telegram 推送。")
         return
 
     # 获取北京时间 (UTC+8)
@@ -56,9 +56,9 @@ def send_tg_message(status_icon, status_text, time_left=""):
         f"⏱️ 续期时间: {current_time_str}"
     )
 
-    url = f"https://api.telegram.org/bot{TG_BOT_TOKEN}/sendMessage"
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {
-        "chat_id": TG_CHAT_ID,
+        "chat_id": TELEGRAM_CHAT_ID,
         "text": text
     }
     
@@ -234,21 +234,9 @@ def login(sb) -> bool:
     sb.uc_open_with_reconnect(TURNSTILE_URL, reconnect_time=8)
     time.sleep(6)
 
-    # 先等待 Cloudflare 验证通过（最多等 30 秒）
-    print("⏳ 等待 Cloudflare 验证通过...")
-    cf_passed = False
-    for i in range(30):
-        page_src = sb.get_page_source() or ""
-        if 'input[name="email"]' in page_src.lower() or 'name="email"' in page_src.lower():
-            cf_passed = True
-            print(f"✅ Cloudflare 验证已通过（{i+1}s）")
-            break
-        time.sleep(1)
-    if not cf_passed:
-        print("⚠️ Cloudflare 验证可能未通过，继续尝试...")
 
 
-    time.sleep(6)
+    time.sleep(16)
 
      # 等待 Turnstile 验证框出现（最多 10 秒）
     print("⏳ 等待 Turnstile 验证框出现...")
