@@ -160,7 +160,7 @@ class JisuSpider:
 
             self.driver.execute_script("arguments[0].focus();", container)
 
-            
+            sleep(800)
 
             logger.info(f"🖱️ - [{context}] 焦点马上点击")
 
