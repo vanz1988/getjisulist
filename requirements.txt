@@ -1,4 +1,5 @@
-seleniumbase
+undetected-chromedriver
+selenium
 requests
 python-dotenv
 beautifulsoup4
