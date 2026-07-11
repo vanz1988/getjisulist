@@ -33,7 +33,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
-          sudo apt-get update && sudo apt-get install -y xvfb
+          sudo apt-get update && sudo apt-get install -y xvfb x11-utils xdotool scrot fonts-noto-cjk
 
       - name: ⚙ 设置代理 (sing-box)
         continue-on-error: true
