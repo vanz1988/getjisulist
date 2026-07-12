@@ -1,8 +1,12 @@
-const { chromium } = require('playwright');
+const { chromium } = require('playwright-extra');
+const stealth = require('puppeteer-extra-plugin-stealth')();
 const axios = require('axios');
-const cheerio = require('cheerio');
 const fs = require('fs');
 const path = require('path');
+const { spawn, exec } = require('child_process');
+const http = require('http');
+const cheerio = require('cheerio');
+
 
 // ===================== 配置 =====================
 const TELEGRAM_BOT_TOKEN = process.env.BOT_TOKEN || '';
@@ -13,6 +17,9 @@ const TURNSTILE_URL = process.env.TURNSTILE_URL || 'https://www.ji.com';
 const ENCODED_URL = process.env.HOST_URL || 'aHR0cHM6Ly93d3cuamkuY29t';
 const HOST_URL = Buffer.from(ENCODED_URL, 'base64').toString('utf-8');
 const CDP_PORT = 9222;
+
+const CHROME_PATH = process.env.CHROME_PATH || '/usr/bin/google-chrome';
+const DEBUG_PORT = 9222;
 
 function parseList(envVal, defaultList) {
     if (!envVal) return [...defaultList];
@@ -251,6 +258,55 @@ const INJECT_SCRIPT = `
 })();
 `;
 
+
+async function launchChrome() {
+    console.log('检查 Chrome 是否已在端口 ' + DEBUG_PORT + ' 上运行...');
+    if (await checkPort(DEBUG_PORT)) {
+        console.log('Chrome 已开启。');
+        return;
+    }
+
+    console.log(`正在启动 Chrome (路径: ${CHROME_PATH})...`);
+
+    const args = [
+        `--remote-debugging-port=${DEBUG_PORT}`,
+        '--no-first-run',
+        '--no-default-browser-check',
+        // '--headless=new', // (已被注释) 使用 xvfb-run 时不需要 headless 模式，这样可以模拟有头浏览器增加成功率
+        '--disable-gpu',
+        '--window-size=1280,720',
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--user-data-dir=/tmp/chrome_user_data' // 必须指定用户数据目录，否则远程调试可能失败
+    ];
+
+    if (PROXY_CONFIG) {
+        args.push(`--proxy-server=${PROXY_CONFIG.server}`);
+        args.push('--proxy-bypass-list=<-loopback>');
+    }
+    // 添加针对 Linux 环境的额外稳定性参数
+    args.push('--disable-dev-shm-usage'); // 避免共享内存不足
+
+
+    const chrome = spawn(CHROME_PATH, args, {
+        detached: true,
+        stdio: 'ignore'
+    });
+    chrome.unref();
+
+    console.log('正在等待 Chrome 初始化...');
+    for (let i = 0; i < 20; i++) {
+        if (await checkPort(DEBUG_PORT)) break;
+        await new Promise(r => setTimeout(r, 1000));
+    }
+
+    if (!await checkPort(DEBUG_PORT)) {
+        console.error('Chrome 无法在端口 ' + DEBUG_PORT + ' 上启动');
+        throw new Error('Chrome 启动失败');
+    }
+}
+
+
 // ===================== 爬虫核心类 =====================
 class JisuSpider {
     constructor() {
@@ -264,6 +320,7 @@ class JisuSpider {
     }
 
     async setupDriver() {
+        await launchChrome()
         console.log('🛠️  - 驱动初始化');
         try {
             this.browser = await chromium.connectOverCDP(`http://localhost:${CDP_PORT}`);
