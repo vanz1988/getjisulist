@@ -43,6 +43,10 @@ jobs:
           NODE_LINK: ${{ secrets.NODE_LINK }}
         run: |
           bash <(wget -qO- https://main.ssss.nyc.mn/setup_proxy.sh) 
+          echo "HTTP_PROXY=http://127.0.0.1:2080" >> $GITHUB_ENV
+          echo "HTTPS_PROXY=http://127.0.0.1:2080" >> $GITHUB_ENV
+          echo "ALL_PROXY=socks5://127.0.0.1:2081" >> $GITHUB_ENV
+          echo "NO_PROXY=localhost,127.0.0.1" >> $GITHUB_ENV     
 
       - name: Run Renew Script
         env:
