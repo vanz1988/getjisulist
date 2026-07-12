@@ -417,7 +417,7 @@ class JisuSpider {
         console.log(`已构建 axios 会话，cookies: ${cookies.length} 个`);
     }
 
-    async passTurnstile(url, maxAttempts = 5) {
+    async passTurnstile(url, maxAttempts = 2) {
         console.log(`🌐 访问 Turnstile URL: ${url}`);
 
         await this.page.goto(url, { waitUntil: 'domcontentloaded' });
@@ -442,7 +442,7 @@ class JisuSpider {
            
             if (cdpClickResult) {
                 console.log('   >> 登录 CDP 点击生效。正在等待最多 10秒 Cloudflare 成功标志...');
-                for (let waitSec = 0; waitSec < 30; waitSec++) {
+                for (let waitSec = 0; waitSec < 20; waitSec++) {
                     const frames = this.page.frames();
                     
                     for (const f of frames) {
