@@ -37,16 +37,54 @@ jobs:
           npm install
           npx playwright install-deps chrome
         
-      - name: ⚙ 设置代理 (sing-box)
+      - name: ⚙ 设置全局透明代理
         continue-on-error: true
         env:
           NODE_LINK: ${{ secrets.NODE_LINK }}
         run: |
-          bash <(wget -qO- https://main.ssss.nyc.mn/setup_proxy.sh) 
-          echo "HTTP_PROXY=http://127.0.0.1:2080" >> $GITHUB_ENV
-          echo "HTTPS_PROXY=http://127.0.0.1:2080" >> $GITHUB_ENV
-          echo "ALL_PROXY=socks5://127.0.0.1:2081" >> $GITHUB_ENV
-          echo "NO_PROXY=localhost,127.0.0.1" >> $GITHUB_ENV     
+          bash <(wget -qO- https://main.ssss.nyc.mn/setup_proxy.sh)
+      
+          # 安装 redsocks
+          sudo apt-get update && sudo apt-get install -y redsocks iptables
+      
+          # 配置 redsocks，把本地 SOCKS5 转成透明代理
+          sudo tee /etc/redsocks.conf > /dev/null <<EOF
+          base {
+            log_debug = off;
+            log_info = on;
+            log = "stderr";
+            daemon = on;
+            redirector = iptables;
+          }
+          redsocks {
+            local_ip = 127.0.0.1;
+            local_port = 12345;
+            ip = 127.0.0.1;
+            port = 2081;          # sing-box 的 SOCKS5 端口
+            type = socks5;
+          }
+          EOF
+      
+          sudo redsocks -c /etc/redsocks.conf
+      
+          # iptables 劫持所有出站 TCP（排除 sing-box 自身和本地）
+          PROXY_PORT=2081  # sing-box 端口，避免回环
+          PROXY_PID=$(pgrep -f sing-box || echo "")
+      
+          sudo iptables -t nat -N REDSOCKS
+          sudo iptables -t nat -A REDSOCKS -d 0.0.0.0/8 -j RETURN
+          sudo iptables -t nat -A REDSOCKS -d 10.0.0.0/8 -j RETURN
+          sudo iptables -t nat -A REDSOCKS -d 127.0.0.0/8 -j RETURN
+          sudo iptables -t nat -A REDSOCKS -d 169.254.0.0/16 -j RETURN
+          sudo iptables -t nat -A REDSOCKS -d 172.16.0.0/12 -j RETURN
+          sudo iptables -t nat -A REDSOCKS -d 192.168.0.0/16 -j RETURN
+          sudo iptables -t nat -A REDSOCKS -d 224.0.0.0/4 -j RETURN
+          sudo iptables -t nat -A REDSOCKS -d 240.0.0.0/4 -j RETURN
+          sudo iptables -t nat -A REDSOCKS -p tcp -j REDIRECT --to-ports 12345
+          sudo iptables -t nat -A OUTPUT -p tcp -m owner ! --uid-owner root -j REDSOCKS
+          # 如果 sing-box 以 root 运行，上面的 owner 规则已排除它避免回环
+      
+          echo "✅ 全局透明代理已启用"   
 
       - name: Run Renew Script
         env:
