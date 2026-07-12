@@ -437,11 +437,12 @@ class JisuSpider {
             await this.page.waitForTimeout(1000);
         }
 
+        let isSuccess = false;
         if (cdpClickResult) {
             console.log('   >> 登录 CDP 点击生效。正在等待最多 10秒 Cloudflare 成功标志...');
-            for (let waitSec = 0; waitSec < 10; waitSec++) {
+            for (let waitSec = 0; waitSec < 30; waitSec++) {
                 const frames = this.page.frames();
-                let isSuccess = false;
+                
                 for (const f of frames) {
                     if (f.url().includes('cloudflare')) {
                         try {
@@ -451,6 +452,14 @@ class JisuSpider {
                             }
                         } catch (e) { }
                     }
+                }
+                if (!isSuccess) {
+                    try {
+                        const cardElement = this.page.locator('.card-content-h1');
+                        if (await cardElement.count() > 0) {
+                            isSuccess = true;
+                        }
+                    } catch (e) { /* 忽略错误 */ }
                 }
                 if (isSuccess) {
                     console.log('   >> 登录前 Turnstile 验证成功。');
@@ -462,21 +471,12 @@ class JisuSpider {
             console.log('   >> 登录前未检测到或未点击 Turnstile，继续操作...');
         }
 
-        for (let i = 0; i < maxAttempts; i++) {
-            console.log(`打码第 ${i + 1} 次尝试...`);
-            if (await solveTurnstile(this.page, `PassTurnstile-${i + 1}`, 5, 3000)) {
-                try {
-                    await this.page.waitForSelector('.card-content-h1', { timeout: 8000 });
-                    console.log('打码成功！');
-                    await this.buildSession();
-                    return true;
-                } catch {}
-            }
-            console.log(`第 ${i + 1} 次打码未通过，重试...`);
+        if(!isSuccess){
+            console.log('打码可能失败了');
+        }else{
+            await this.buildSession();
         }
-
-        console.log(`打码失败，已尝试 ${maxAttempts} 次`);
-        return false;
+        return isSuccess;
     }
 
     async getPage(url, retries = 3) {
