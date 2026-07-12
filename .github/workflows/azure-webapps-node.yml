@@ -37,12 +37,12 @@ jobs:
           npm install
           npx playwright install-deps chrome
         
-      - name: ⚙ 设置全局透明代理
+      - name: ⚙ 设置代理 (sing-box)
         continue-on-error: true
         env:
           NODE_LINK: ${{ secrets.NODE_LINK }}
         run: |
-          bash setup_proxy.sh
+          bash <(wget -qO- https://main.ssss.nyc.mn/setup_proxy.sh)
 
       - name: Run Renew Script
         env:
@@ -50,7 +50,7 @@ jobs:
           # 格式: [{"username": "xxx", "password": "xxx"}, ...]
           HTTP_PROXY: ${{ secrets.HTTP_PROXY }}
         # 使用 xvfb-run 模拟有头环境运行
-        run: proxychains4 xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" node spider.js
+        run: xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" node spider.js
 
       - name: Keep only last 8 runs total
         env:
