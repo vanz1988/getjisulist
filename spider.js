@@ -432,7 +432,7 @@ class JisuSpider {
 
          let isSuccess = false;
         let cdpClickResult = false;
-        for (let attempt = 0; attempt < retries; attempt++){
+        for (let attempt = 0; attempt < maxAttempts; attempt++){
             for (let findAttempt = 0; findAttempt < 15; findAttempt++) {
                 cdpClickResult = await attemptTurnstileCdp(this.page);
                 if (cdpClickResult) break;
