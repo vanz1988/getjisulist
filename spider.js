@@ -28,7 +28,7 @@ process.env.NO_PROXY = 'localhost,127.0.0.1';
 
 let PROXY_CONFIG = null;
 
-/*if (HTTP_PROXY) {
+if (HTTP_PROXY) {
     try {
         const proxyUrl = new URL(HTTP_PROXY);
         PROXY_CONFIG = {
@@ -41,7 +41,7 @@ let PROXY_CONFIG = null;
         console.error('[代理] TODO HTTP_PROXY 格式无效。期望格式: http://user:pass@host:port 或 http://host:port');
         process.exit(1);
     }
-}*/
+}
 
 if (HTTP_PROXY) {
     try {
@@ -404,6 +404,19 @@ class JisuSpider {
             console.error(`- 驱动启动失败: ${e.message}`);
             throw e;
         }
+
+        try {
+            const ipRes = await fetch('https://api.ip.sb/ip');
+            if (ipRes.ok) {
+                const ip = (await ipRes.text()).trim();
+                console.log(`📍 当前出口IP: ${ip}${IS_PROXY ? ' (代理)' : ' (直连)'}`);
+            } else {
+                console.warn(`⚠️ 获取出站 IP 失败: HTTP ${ipRes.status}`);
+            }
+        } catch (e) {
+            console.warn(`⚠️ 获取出站 IP 出错: ${e.message}`);
+        }
+        
         const context = this.browser.contexts()[0];
         if (!context) {
             throw new Error('无法获取浏览器上下文');
