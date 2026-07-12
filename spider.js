@@ -638,8 +638,7 @@ class JisuSpider {
     }
 }
 
-// ===================== 主入口 =====================
-async function main() {
+(async () => {
     const spider = new JisuSpider();
     const [success, msg] = await spider.run();
 
@@ -652,9 +651,7 @@ async function main() {
     }
 
     console.log('\n✅ 抓取流程结束！');
-}
+    await browser.close();
+    process.exit(0);
+})();
 
-main().catch(err => {
-    console.error('发生错误:', err);
-    process.exit(1);
-});
