@@ -42,43 +42,7 @@ jobs:
         env:
           NODE_LINK: ${{ secrets.NODE_LINK }}
         run: |
-          bash <(wget -qO- https://main.ssss.nyc.mn/setup_proxy.sh)
-      
-          sudo apt-get update -qq && sudo apt-get install -y -qq redsocks iptables > /dev/null 2>&1
-      
-          sudo tee /etc/redsocks.conf > /dev/null << 'REDEOF'
-          base {
-          log_debug = off;
-          log_info = on;
-          log = "stderr";
-          daemon = on;
-          redirector = iptables;
-          }
-          redsocks {
-          local_ip = 127.0.0.1;
-          local_port = 12345;
-          ip = 127.0.0.1;
-          port = 1080;
-          type = socks5;
-          }
-          REDEOF
-      
-          sudo killall redsocks 2>/dev/null; sudo redsocks -c /etc/redsocks.conf
-      
-          sudo iptables -t nat -N REDSOCKS 2>/dev/null || true
-          sudo iptables -t nat -F REDSOCKS
-          sudo iptables -t nat -A REDSOCKS -d 0.0.0.0/8 -j RETURN
-          sudo iptables -t nat -A REDSOCKS -d 10.0.0.0/8 -j RETURN
-          sudo iptables -t nat -A REDSOCKS -d 127.0.0.0/8 -j RETURN
-          sudo iptables -t nat -A REDSOCKS -d 169.254.0.0/16 -j RETURN
-          sudo iptables -t nat -A REDSOCKS -d 172.16.0.0/12 -j RETURN
-          sudo iptables -t nat -A REDSOCKS -d 192.168.0.0/16 -j RETURN
-          sudo iptables -t nat -A REDSOCKS -d 224.0.0.0/4 -j RETURN
-          sudo iptables -t nat -A REDSOCKS -d 240.0.0.0/4 -j RETURN
-          sudo iptables -t nat -A REDSOCKS -p tcp -j REDIRECT --to-ports 12345
-          sudo iptables -t nat -A OUTPUT -p tcp -m owner ! --uid-owner root -j REDSOCKS
-      
-          echo "✅ 全局透明代理已启用"
+          bash setup_proxy.sh
 
       - name: Run Renew Script
         env:
