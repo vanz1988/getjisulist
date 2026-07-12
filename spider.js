@@ -430,46 +430,55 @@ class JisuSpider {
             return true;
         } catch {}
 
+         let isSuccess = false;
         let cdpClickResult = false;
-        for (let findAttempt = 0; findAttempt < 15; findAttempt++) {
-            cdpClickResult = await attemptTurnstileCdp(this.page);
-            if (cdpClickResult) break;
-            await this.page.waitForTimeout(1000);
-        }
-
-        let isSuccess = false;
-        if (cdpClickResult) {
-            console.log('   >> 登录 CDP 点击生效。正在等待最多 10秒 Cloudflare 成功标志...');
-            for (let waitSec = 0; waitSec < 30; waitSec++) {
-                const frames = this.page.frames();
-                
-                for (const f of frames) {
-                    if (f.url().includes('cloudflare')) {
-                        try {
-                            if (await f.getByText('Success!', { exact: false }).isVisible({ timeout: 500 })) {
-                                isSuccess = true;
-                                break;
-                            }
-                        } catch (e) { }
-                    }
-                }
-                if (!isSuccess) {
-                    try {
-                        const cardElement = this.page.locator('.card-content-h1');
-                        if (await cardElement.count() > 0) {
-                            isSuccess = true;
-                        }
-                    } catch (e) { /* 忽略错误 */ }
-                }
-                if (isSuccess) {
-                    console.log('   >> 登录前 Turnstile 验证成功。');
-                    break;
-                }
+        for (let attempt = 0; attempt < retries; attempt++){
+            for (let findAttempt = 0; findAttempt < 15; findAttempt++) {
+                cdpClickResult = await attemptTurnstileCdp(this.page);
+                if (cdpClickResult) break;
                 await this.page.waitForTimeout(1000);
             }
-        } else {
-            console.log('   >> 登录前未检测到或未点击 Turnstile，继续操作...');
+    
+           
+            if (cdpClickResult) {
+                console.log('   >> 登录 CDP 点击生效。正在等待最多 10秒 Cloudflare 成功标志...');
+                for (let waitSec = 0; waitSec < 30; waitSec++) {
+                    const frames = this.page.frames();
+                    
+                    for (const f of frames) {
+                        if (f.url().includes('cloudflare')) {
+                            try {
+                                if (await f.getByText('Success!', { exact: false }).isVisible({ timeout: 500 })) {
+                                    isSuccess = true;
+                                    break;
+                                }
+                            } catch (e) { }
+                        }
+                    }
+                    if (!isSuccess) {
+                        try {
+                            const cardElement = this.page.locator('.card-content-h1');
+                            if (await cardElement.count() > 0) {
+                                isSuccess = true;
+                            }
+                        } catch (e) { /* 忽略错误 */ }
+                    }
+                    if (isSuccess) {
+                        console.log('   >> 登录前 Turnstile 验证成功。');
+                        break;
+                    }
+                    await this.page.waitForTimeout(1000);
+                }
+            } else {
+                console.log('   >> 登录前未检测到或未点击 Turnstile，继续操作...');
+            }
+
+            if (isSuccess) {
+                console.log('   >> 登录前 Turnstile 验证成功。');
+                break;
+            }
         }
+        
 
         if(!isSuccess){
             console.log('打码可能失败了');
