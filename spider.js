@@ -17,9 +17,31 @@ const TURNSTILE_URL = process.env.TURNSTILE_URL || 'https://www.ji.com';
 const ENCODED_URL = process.env.HOST_URL || 'aHR0cHM6Ly93d3cuamkuY29t';
 const HOST_URL = Buffer.from(ENCODED_URL, 'base64').toString('utf-8');
 const CDP_PORT = 9222;
+const HTTP_PROXY = process.env.HTTP_PROXY || '';
+
+chromium.use(stealth);
 
 const CHROME_PATH = process.env.CHROME_PATH || '/usr/bin/google-chrome';
 const DEBUG_PORT = 9222;
+
+process.env.NO_PROXY = 'localhost,127.0.0.1';
+
+let PROXY_CONFIG = null;
+
+if (HTTP_PROXY) {
+    try {
+        const proxyUrl = new URL(HTTP_PROXY);
+        PROXY_CONFIG = {
+            server: `${proxyUrl.protocol}//${proxyUrl.hostname}:${proxyUrl.port}`,
+            username: proxyUrl.username ? decodeURIComponent(proxyUrl.username) : undefined,
+            password: proxyUrl.password ? decodeURIComponent(proxyUrl.password) : undefined
+        };
+        console.log(`[代理] 检测到配置: 服务器=${PROXY_CONFIG.server}, 认证=${PROXY_CONFIG.username ? '是' : '否'}`);
+    } catch (e) {
+        console.error('[代理] TODO HTTP_PROXY 格式无效。期望格式: http://user:pass@host:port 或 http://host:port');
+        process.exit(1);
+    }
+}
 
 function parseList(envVal, defaultList) {
     if (!envVal) return [...defaultList];
