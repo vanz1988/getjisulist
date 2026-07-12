@@ -651,7 +651,6 @@ class JisuSpider {
     }
 
     console.log('\n✅ 抓取流程结束！');
-    await browser.close();
     process.exit(0);
 })();
 
