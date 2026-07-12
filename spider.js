@@ -499,7 +499,6 @@ class JisuSpider {
             }
 
             if (isSuccess) {
-                console.log('   >> 登录前 Turnstile 验证成功。');
                 break;
             }
         }
