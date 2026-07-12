@@ -25,16 +25,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          python-version: '3.11'
-
-      - name: Install dependencies
+          node-version: '20'
+          
+      - name: Install Dependencies
         run: |
-          pip install -r requirements.txt
-          sudo apt-get update && sudo apt-get install -y xvfb xdotool 
-
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+          npm install
+          npx playwright install-deps chrome
+        
       - name: ⚙ 设置代理 (sing-box)
         continue-on-error: true
         env:
@@ -42,12 +44,16 @@ jobs:
         run: |
           bash <(wget -qO- https://main.ssss.nyc.mn/setup_proxy.sh) 
 
-      - name: 🚀 运行续期脚本
+      - name: Run Renew Script
         env:
-          HEADLESS: 'false'
-        run: |
-          xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" \
-            python3 spider.py
+          # 将 USERS_JSON 配置在 GitHub Repository Secrets 中
+          # 格式: [{"username": "xxx", "password": "xxx"}, ...]
+          USERS_JSON: ${{ secrets.USERS_JSON }}
+          HTTP_PROXY: ${{ secrets.HTTP_PROXY }}
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+        # 使用 xvfb-run 模拟有头环境运行
+        run: xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" node spider.js
 
       - name: Keep only last 8 runs total
         env:
