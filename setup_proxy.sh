@@ -449,34 +449,32 @@ for i in {1..3}; do
     echo "IS_PROXY=true" >> $GITHUB_ENV
     echo "PROXY_SERVER=socks5://127.0.0.1:1080" >> $GITHUB_ENV
 
-    export http_proxy=http://127.0.0.1:1081
-    export https_proxy=http://127.0.0.1:1081
-    export ALL_PROXY=socks5://127.0.0.1:1080
-    export no_proxy=localhost,127.0.0.1,::1
+    echo "http_proxy=http://127.0.0.1:1081" >> $GITHUB_ENV
+    echo "https_proxy=http://127.0.0.1:1081" >> $GITHUB_ENV
+    echo "ALL_PROXY=socks5://127.0.0.1:1080" >> $GITHUB_ENV
+    echo "no_proxy=localhost,127.0.0.1,::1" >> $GITHUB_ENV
 
-    sudo tee /etc/profile.d/proxy.sh > /dev/null << 'PEOF'
-export http_proxy=http://127.0.0.1:1081
-export https_proxy=http://127.0.0.1:1081
-export ALL_PROXY=socks5://127.0.0.1:1080
-export no_proxy=localhost,127.0.0.1,::1
-PEOF
-    sudo chmod 644 /etc/profile.d/proxy.sh
+    echo "[INFO] 安装 proxychains4 实现进程级全局代理..."
+    sudo apt-get install -y proxychains4
 
-    sudo tee /etc/apt/apt.conf.d/95proxy > /dev/null << 'AEOF'
-Acquire::http::Proxy "http://127.0.0.1:1081";
-Acquire::https::Proxy "http://127.0.0.1:1081";
-AEOF
+    sudo tee /etc/proxychains4.conf > /dev/null << 'PROXYCHAINS'
+strict_chain
+proxy_dns
+quiet_mode
 
-    git config --global http.proxy http://127.0.0.1:1081
-    git config --global https.proxy http://127.0.0.1:1081
+localnet 127.0.0.0/255.0.0.0
+localnet 10.0.0.0/255.0.0.0
+localnet 172.16.0.0/255.240.0.0
+localnet 192.168.0.0/255.255.0.0
+
+[ProxyList]
+socks5 127.0.0.1 1080
+PROXYCHAINS
 
     echo "[INFO] 全局代理已配置:"
-    echo "  - 环境变量: http_proxy / https_proxy / ALL_PROXY"
-    echo "  - 新终端自动加载: /etc/profile.d/proxy.sh"
-    echo "  - apt 代理: /etc/apt/apt.conf.d/95proxy"
-    echo "  - git 代理: ~/.gitconfig"
-    echo ""
-    echo "[INFO] 当前终端请执行: source /etc/profile.d/proxy.sh"
+    echo "  - proxychains4: 所有TCP连接走 socks5://127.0.0.1:1080"
+    echo "  - 使用方式: proxychains4 <command>"
+    echo "  - GITHUB_ENV: http_proxy / https_proxy / ALL_PROXY"
     exit 0
   fi
   echo "[WARN] å°è¯• $i/3..."
