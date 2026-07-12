@@ -28,7 +28,7 @@ process.env.NO_PROXY = 'localhost,127.0.0.1';
 
 let PROXY_CONFIG = null;
 
-if (HTTP_PROXY) {
+/*if (HTTP_PROXY) {
     try {
         const proxyUrl = new URL(HTTP_PROXY);
         PROXY_CONFIG = {
@@ -41,6 +41,18 @@ if (HTTP_PROXY) {
         console.error('[代理] TODO HTTP_PROXY 格式无效。期望格式: http://user:pass@host:port 或 http://host:port');
         process.exit(1);
     }
+}*/
+
+if (HTTP_PROXY) {
+    try {
+        const { ProxyAgent, setGlobalDispatcher } = require('undici');
+        setGlobalDispatcher(new ProxyAgent(HTTP_PROXY));
+        // console.log(`✅ fetch 代理已启用: ${HTTP_PROXY}`);
+    } catch (e) {
+        console.warn(`⚠️ 无法加载 undici 代理模块，fetch 将直连: ${e.message}`);
+    }
+} else {
+    // console.log('ℹ️ 未启用代理，fetch 直连模式');
 }
 
 function parseList(envVal, defaultList) {
