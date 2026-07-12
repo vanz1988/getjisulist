@@ -259,6 +259,47 @@ const INJECT_SCRIPT = `
 `;
 
 
+// 辅助函数：检测代理是否可用
+async function checkProxy() {
+    if (!PROXY_CONFIG) return true;
+
+    console.log('[代理] 正在验证代理连接...');
+    try {
+        const axiosConfig = {
+            proxy: {
+                protocol: 'http',
+                host: new URL(PROXY_CONFIG.server).hostname,
+                port: new URL(PROXY_CONFIG.server).port,
+            },
+            timeout: 10000
+        };
+
+        if (PROXY_CONFIG.username && PROXY_CONFIG.password) {
+            axiosConfig.proxy.auth = {
+                username: PROXY_CONFIG.username,
+                password: PROXY_CONFIG.password
+            };
+        }
+
+        await axios.get('https://www.google.com', axiosConfig);
+        console.log('[代理] 连接成功！');
+        return true;
+    } catch (error) {
+        console.error(`[代理] 连接失败: ${error.message}`);
+        return false;
+    }
+}
+
+function checkPort(port) {
+    return new Promise((resolve) => {
+        const req = http.get(`http://localhost:${port}/json/version`, (res) => {
+            resolve(true);
+        });
+        req.on('error', () => resolve(false));
+        req.end();
+    });
+}
+
 async function launchChrome() {
     console.log('检查 Chrome 是否已在端口 ' + DEBUG_PORT + ' 上运行...');
     if (await checkPort(DEBUG_PORT)) {
