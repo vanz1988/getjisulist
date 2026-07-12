@@ -409,7 +409,7 @@ class JisuSpider {
             const ipRes = await fetch('https://api.ip.sb/ip');
             if (ipRes.ok) {
                 const ip = (await ipRes.text()).trim();
-                console.log(`📍 当前出口IP: ${ip}${IS_PROXY ? ' (代理)' : ' (直连)'}`);
+                console.log(`📍 当前出口IP: ${ip}`);
             } else {
                 console.warn(`⚠️ 获取出站 IP 失败: HTTP ${ipRes.status}`);
             }
