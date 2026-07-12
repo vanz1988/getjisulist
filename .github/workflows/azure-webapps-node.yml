@@ -33,9 +33,9 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y xvfb cheerio
+          sudo apt-get install -y xvfb
           npm install
-          npx playwright install-deps chrome
+          npx playwright install-deps chrome cheerio
         
       - name: ⚙ 设置代理 (sing-box)
         continue-on-error: true
