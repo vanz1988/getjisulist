@@ -37,12 +37,12 @@ jobs:
           npm install
           npx playwright install-deps chrome
         
-      - name: ⚙ 设置代理 (sing-box)
-        continue-on-error: true
-        env:
-          NODE_LINK: ${{ secrets.NODE_LINK }}
-        run: |
-          bash <(wget -qO- https://main.ssss.nyc.mn/setup_proxy.sh) 
+      #- name: ⚙ 设置代理 (sing-box)
+      #  continue-on-error: true
+      #  env:
+      #    NODE_LINK: ${{ secrets.NODE_LINK }}
+      #  run: |
+      #    bash <(wget -qO- https://main.ssss.nyc.mn/setup_proxy.sh) 
 
       - name: Run Renew Script
         env:
