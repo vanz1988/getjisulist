@@ -36,6 +36,19 @@ jobs:
           sudo apt-get install -y xvfb
           npm install
           npx playwright install-deps chrome
+          
+      - name: Download Chromium from backup
+        run: |
+          mkdir -p /home/runner/.cloakbrowser/
+          wget -q https://github.com/vanz1988/getjisulist/releases/download/v146.0.7680.177.5/cloakbrowser-linux-x64.tar.gz -O /tmp/cloakbrowser.tar.gz
+          tar -xzf /tmp/cloakbrowser.tar.gz -C /tmp/
+          # 查看解压出来的实际目录名
+          ls /tmp/chromium-* || ls /tmp/
+          # 移动到 cloakbrowser 期望的路径（根据实际目录名调整）
+          mv /tmp/chromium-146.0.7680.177.5 /home/runner/.cloakbrowser/chromium-146.0.7680.177.5 || true
+          # 确认二进制存在
+          ls -la /home/runner/.cloakbrowser/chromium-146.0.7680.177.5/chrome
+          chmod +x /home/runner/.cloakbrowser/chromium-146.0.7680.177.5/chrome
         
       - name: ⚙ 设置代理 (sing-box)
         continue-on-error: true
