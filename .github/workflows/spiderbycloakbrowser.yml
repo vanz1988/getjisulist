@@ -50,7 +50,7 @@ jobs:
           # 格式: [{"username": "xxx", "password": "xxx"}, ...]
           HTTP_PROXY: ${{ secrets.HTTP_PROXY }}
         # 使用 xvfb-run 模拟有头环境运行
-        run: xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" node spider_ cloakbrowser.js
+        run: xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" node spider_cloakbrowser.js
 
       - name: Keep only last 8 runs total
         env:
