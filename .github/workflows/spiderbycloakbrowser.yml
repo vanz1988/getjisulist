@@ -1,4 +1,4 @@
-name: Auto spider list
+name: Auto spiderbycloakbrowser list
 
 on:  
   schedule:
