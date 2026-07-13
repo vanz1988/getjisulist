@@ -346,6 +346,55 @@ class JisuSpider {
                             } catch (e) { }
                         }
                     }
+
+                    try {
+                        const token = await page.evaluate(() => {
+                            const els = document.querySelectorAll(
+                                'input[name="cf-turnstile-response"]'
+                            );
+                            for (const el of els) {
+                                if (el.value && el.value.length > 12) return el.value;
+                            }
+                            return '';
+                        });
+                        if (token) {
+                            isSuccess = true;
+                            console.log('   >> token Turnstile 验证成功。');
+                        }
+                    } catch { }
+
+            
+                    const frames2 = page.frames();
+                    for (const f of frames2) {
+                        if (f.url().includes('cloudflare')) {
+                            try {
+                                if (await f.getByText('Success!', { exact: false }).isVisible({ timeout: 500 })) {
+                                    isSuccess = true;
+                                    console.log('   >> frames2 Turnstile 验证成功。');
+                                    break;
+                                }
+                            } catch (e) { }
+                        }
+                    }
+                    
+
+
+
+                    const finalContent = await page.content();
+                    if (finalContent.includes("challenge-platform") === false) {
+                        isSuccess = true;
+                        console.log('   >> finalContent Turnstile 验证成功。');
+                    }
+                    
+
+                    const cookies = await page.cookies();
+                    if (cookies.some(c => c.name === 'cf_clearance')) {
+                        isSuccess = true;
+                        console.log('   >> cf_clearance Turnstile 验证成功。');
+                        break;
+                    }
+                    
+
                     if (!isSuccess) {
                         try {
                             isSuccess = await this.page.evaluate(() => !!document.querySelector('.card-content-h1'));
