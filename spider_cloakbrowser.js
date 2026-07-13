@@ -472,7 +472,7 @@ class JisuSpider {
         let cdpClickResult = false;
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
 
-            const content = await page.content();
+            const content = await this.page.content();
 
             if (content.includes("challenge-platform") === true){
                 console.log('检测到码');
