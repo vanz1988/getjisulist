@@ -409,14 +409,13 @@ class JisuSpider {
                 }
             } else {
 
-                try {
-                    const cardElement = await this.page.$('.card-content-h1');
-                    if (cardElement) {
-                        console.log('   >> 登录前 Turnstile 验证成功。');
-                        isSuccess = true;
-                        break
-                    }
-                } catch (e) { }
+                const cardElement = await this.page.$('.card-content-h1');
+                if (cardElement) {
+                    console.log('   >> 登录前 Turnstile 验证成功。');
+                    isSuccess = true;
+                    break
+                }
+
               
                 console.log('   >> 登录前未检测到或未点击 Turnstile，继续操作...');
             }
@@ -426,7 +425,7 @@ class JisuSpider {
             }
         }
 
-        if (!isSuccess&&docdpflag==false) {
+        if (!isSuccess) {
             console.log('打码可能失败了');
         } else {
             await this.buildSession();
