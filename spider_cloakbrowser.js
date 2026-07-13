@@ -3,6 +3,8 @@ const fs = require('fs');
 const path = require('path');
 const http = require('http');
 const cheerio = require('cheerio');
+const express = require('express');
+const winston = require('winston');
 
 // ===================== 配置 =====================
 const TELEGRAM_BOT_TOKEN = process.env.BOT_TOKEN || '';
@@ -14,6 +16,49 @@ const ENCODED_URL = process.env.HOST_URL || 'aHR0cHM6Ly93d3cuamkuY29t';
 const HOST_URL = Buffer.from(ENCODED_URL, 'base64').toString('utf-8');
 const HTTP_PROXY = process.env.HTTP_PROXY || '';
 const CUSTOM_UA = process.env.CUSTOM_UA || '';
+
+
+
+const lang = process.argv.includes('--lang=en') ? 'en' : 'zh';
+
+const i18n = {
+  zh: {
+    apiError: 'API 错误: ',
+    serverRunning: '服务已启动，监听地址: http://localhost:',
+    locError: '定位报错: ',
+    locSuccess: '[定位成功] 原始外框: ',
+    pageClosed: '页面已关闭',
+    clickPos: '[执行点击] 落脚点: ',
+    foundCaptcha: '发现 CloudFlare 验证码',
+    fastModeSuccess: 'FastMode: 已获取到 cf_clearance，提前结束！',
+    solved: '验证码已解决',
+    noCaptcha: '未检测到验证码'
+  },
+  en: {
+    apiError: 'API Error: ',
+    serverRunning: 'Server is running at http://localhost:',
+    locError: 'Locator Error: ',
+    locSuccess: '[Locator Success] Box: ',
+    pageClosed: 'Page closed',
+    clickPos: '[Click Execution] Position: ',
+    foundCaptcha: 'Found CloudFlare challenge',
+    fastModeSuccess: 'FastMode: cf_clearance obtained, ending early!',
+    solved: 'Challenge solved',
+    noCaptcha: 'No challenge detected'
+  }
+};
+
+const t = i18n[lang];
+
+const logger = winston.createLogger({
+  level: 'debug',
+  format: winston.format.combine(
+    winston.format.colorize(),
+    winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+    winston.format.printf(info => `[${info.timestamp}] ${info.level}: ${info.message}`)
+  ),
+  transports: [new winston.transports.Console()]
+});
 
 process.env.NO_PROXY = 'localhost,127.0.0.1';
 
@@ -477,7 +522,7 @@ class JisuSpider {
             if (content.includes("challenge-platform") === true){
                 console.log('检测到码');
                 try {
-                    await checkTurnstile({ this.page });
+                    await checkTurnstile({ page });
                 } catch (err) { }
                 cdpClickResult=true
             }
