@@ -348,7 +348,7 @@ class JisuSpider {
                     }
 
                     try {
-                        const token = await page.evaluate(() => {
+                        const token = await this.page.evaluate(() => {
                             const els = document.querySelectorAll(
                                 'input[name="cf-turnstile-response"]'
                             );
@@ -364,7 +364,7 @@ class JisuSpider {
                     } catch { }
 
             
-                    const frames2 = page.frames();
+                    const frames2 = this.page.frames();
                     for (const f of frames2) {
                         if (f.url().includes('cloudflare')) {
                             try {
@@ -380,14 +380,14 @@ class JisuSpider {
 
 
 
-                    const finalContent = await page.content();
+                    const finalContent = await this.page.content();
                     if (finalContent.includes("challenge-platform") === false) {
                         isSuccess = true;
                         console.log('   >> finalContent Turnstile 验证成功。');
                     }
                     
 
-                    const cookies = await page.cookies();
+                    const cookies = await this.page.cookies();
                     if (cookies.some(c => c.name === 'cf_clearance')) {
                         isSuccess = true;
                         console.log('   >> cf_clearance Turnstile 验证成功。');
