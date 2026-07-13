@@ -362,7 +362,8 @@ async function launchChrome() {
     // 添加针对 Linux 环境的额外稳定性参数
     args.push('--disable-dev-shm-usage'); // 避免共享内存不足
 
-
+    args.push(`--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36`);
+    
     const chrome = spawn(CHROME_PATH, args, {
         detached: true,
         stdio: 'ignore'
