@@ -353,7 +353,7 @@ class JisuSpider {
                                 'input[name="cf-turnstile-response"]'
                             );
                             for (const el of els) {
-                                if (el.value && el.value.length > 12) return el.value;
+                                if (el.value && el.value.length > 2) return el.value;
                             }
                             return '';
                         });
