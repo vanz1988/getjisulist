@@ -79,17 +79,13 @@ if (HTTP_PROXY) {
     }
 }
 
-let is_proxy_enableflag=await checkProxy();
-
-if(is_proxy_enableflag){
-    if (HTTP_PROXY) {
-        try {
-            const { ProxyAgent, setGlobalDispatcher } = require('undici');
-            setGlobalDispatcher(new ProxyAgent(HTTP_PROXY));
-            console.log(`✅ fetch 代理已启用: ${HTTP_PROXY}`);
-        } catch (e) {
-            console.warn(`⚠️ 无法加载 undici 代理模块，fetch 将直连: ${e.message}`);
-        }
+if (HTTP_PROXY) {
+    try {
+        const { ProxyAgent, setGlobalDispatcher } = require('undici');
+        setGlobalDispatcher(new ProxyAgent(HTTP_PROXY));
+        console.log(`✅ fetch 代理已启用: ${HTTP_PROXY}`);
+    } catch (e) {
+        console.warn(`⚠️ 无法加载 undici 代理模块，fetch 将直连: ${e.message}`);
     }
 }
 
@@ -459,13 +455,10 @@ class JisuSpider {
                 args: launchArgs
             };
 
-            if(is_proxy_enableflag){
-                if (HTTP_PROXY) {
-                    launchOptions.proxy = HTTP_PROXY;
-                    launchOptions.geoip = true;
-                }
+            if (HTTP_PROXY) {
+                launchOptions.proxy = HTTP_PROXY;
+                launchOptions.geoip = true;
             }
-
 
             this.browser = await launch(launchOptions);
             console.log('- 驱动启动成功');
@@ -512,7 +505,7 @@ class JisuSpider {
         console.log(`🌐 访问 Turnstile URL: ${url}`);
 
         await this.page.goto(url, { waitUntil: 'domcontentloaded' });
-        await sleep(13000 + Math.random() * 1000);
+        await sleep(3000 + Math.random() * 1000);
 
         try {
             await this.page.waitForSelector('.card-content-h1', { timeout: 5000 });
