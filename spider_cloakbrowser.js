@@ -14,7 +14,7 @@ const PAGE_URLS_ENV = process.env.PAGE_URLS || '';
 const TURNSTILE_URL = process.env.TURNSTILE_URL || 'https://www.ji.com';
 const ENCODED_URL = process.env.HOST_URL || 'aHR0cHM6Ly93d3cuamkuY29t';
 const HOST_URL = Buffer.from(ENCODED_URL, 'base64').toString('utf-8');
-const HTTP_PROXY = process.env.HTTP_PROXY || '';
+const HTTP_PROXY = '';
 const CUSTOM_UA = process.env.CUSTOM_UA || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36';
 
 
