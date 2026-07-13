@@ -325,7 +325,7 @@ async function checkProxy() {
     if (!PROXY_CONFIG) return false;
 
     console.log('[代理] 正在验证代理连接...');
-    return true
+    return false
 }
 
 const checkTurnstile = ({ page }) => {
