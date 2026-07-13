@@ -358,6 +358,7 @@ class JisuSpider {
 
         let isSuccess = false;
         let cdpClickResult = false;
+        let docdpflag=false;
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
 
             const content = await this.page.content();
@@ -367,7 +368,8 @@ class JisuSpider {
                 try {
                     await checkTurnstile({ page: this.page });
                 } catch (err) { }
-                cdpClickResult=true
+                cdpClickResult=true;
+                docdpflag=true;
             }
 
             
@@ -424,7 +426,7 @@ class JisuSpider {
             }
         }
 
-        if (!isSuccess) {
+        if (!isSuccess&&docdpflag==false) {
             console.log('打码可能失败了');
         } else {
             await this.buildSession();
