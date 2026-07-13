@@ -522,7 +522,7 @@ class JisuSpider {
             if (content.includes("challenge-platform") === true){
                 console.log('检测到码');
                 try {
-                    await checkTurnstile({ page });
+                    await checkTurnstile({ this.page });
                 } catch (err) { }
                 cdpClickResult=true
             }
