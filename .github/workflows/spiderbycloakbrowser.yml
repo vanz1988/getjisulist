@@ -42,6 +42,7 @@ jobs:
           mkdir -p /home/runner/.cloakbrowser/chromium-146.0.7680.177.5
           wget https://github.com/vanz1988/getjisulist/releases/download/v146.0.7680.177.5/cloakbrowser-linux-x64.tar.gz
           tar -xzf cloakbrowser-linux-x64.tar.gz -C /home/runner/.cloakbrowser/chromium-146.0.7680.177.5/
+          chmod +x /home/runner/.cloakbrowser/chromium-146.0.7680.177.5/chrome
 
       - name: ⚙ 设置代理 (sing-box)
         continue-on-error: true
