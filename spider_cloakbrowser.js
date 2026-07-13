@@ -505,7 +505,7 @@ class JisuSpider {
         console.log(`🌐 访问 Turnstile URL: ${url}`);
 
         await this.page.goto(url, { waitUntil: 'domcontentloaded' });
-        await sleep(3000 + Math.random() * 1000);
+        await sleep(13000 + Math.random() * 1000);
 
         try {
             await this.page.waitForSelector('.card-content-h1', { timeout: 5000 });
@@ -550,12 +550,9 @@ class JisuSpider {
                         }
                     }
                     if (!isSuccess) {
-  
-                        const cardElement = await this.page.$('.card-content-h1');
-                        if (cardElement) {
-                            isSuccess = true;
-                        }
-  
+                        try {
+                            isSuccess = await this.page.evaluate(() => !!document.querySelector('.card-content-h1'));
+                        } catch (e) { }
                     }
                     if (isSuccess) {
                         console.log('   >> 登录前 Turnstile 验证成功。');
@@ -564,12 +561,13 @@ class JisuSpider {
                     await sleep(1000);
                 }
             } else {
-                const cardElement = await this.page.$('.card-content-h1');
-                if (cardElement) {
-                    isSuccess = true;
-                    console.log('   >> 登录前 Turnstile 验证成功。');
-                    break;
-                }
+                try {
+                    isSuccess = await this.page.evaluate(() => !!document.querySelector('.card-content-h1'));
+                    if (isSuccess) {
+                        console.log('   >> 登录前 Turnstile 验证成功。');
+                        break;
+                    }
+                } catch (e) { }
                 console.log('   >> 登录前未检测到或未点击 Turnstile，继续操作...');
             }
 
