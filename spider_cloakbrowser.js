@@ -78,18 +78,8 @@ if (HTTP_PROXY) {
         process.exit(1);
     }
 }
+let is_proxy_enable = false;
 
-let is_proxy_enable = await checkProxy();
-
-if (HTTP_PROXY&&is_proxy_enable) {
-    try {
-        const { ProxyAgent, setGlobalDispatcher } = require('undici');
-        setGlobalDispatcher(new ProxyAgent(HTTP_PROXY));
-        console.log(`✅ fetch 代理已启用: ${HTTP_PROXY}`);
-    } catch (e) {
-        console.warn(`⚠️ 无法加载 undici 代理模块，fetch 将直连: ${e.message}`);
-    }
-}
 
 function parseList(envVal, defaultList) {
     if (!envVal) return [...defaultList];
@@ -434,7 +424,7 @@ class JisuSpider {
                 args: launchArgs
             };
 
-            if (HTTP_PROXY) {
+            if (HTTP_PROXY&&is_proxy_enable) {
                 launchOptions.proxy = HTTP_PROXY;
                 launchOptions.geoip = true;
             }
@@ -723,6 +713,19 @@ class JisuSpider {
 }
 
 (async () => {
+
+    is_proxy_enable = await checkProxy();
+
+    if (HTTP_PROXY&&is_proxy_enable) {
+        try {
+            const { ProxyAgent, setGlobalDispatcher } = require('undici');
+            setGlobalDispatcher(new ProxyAgent(HTTP_PROXY));
+            console.log(`✅ fetch 代理已启用: ${HTTP_PROXY}`);
+        } catch (e) {
+            console.warn(`⚠️ 无法加载 undici 代理模块，fetch 将直连: ${e.message}`);
+        }
+    }
+
     const spider = new JisuSpider();
     const [success, msg] = await spider.run();
 
