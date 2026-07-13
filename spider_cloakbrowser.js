@@ -79,7 +79,9 @@ if (HTTP_PROXY) {
     }
 }
 
-if (HTTP_PROXY) {
+let is_proxy_enable = await checkProxy();
+
+if (HTTP_PROXY&&is_proxy_enable) {
     try {
         const { ProxyAgent, setGlobalDispatcher } = require('undici');
         setGlobalDispatcher(new ProxyAgent(HTTP_PROXY));
