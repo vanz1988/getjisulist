@@ -332,33 +332,10 @@ const INJECT_SCRIPT = `
 
 // 辅助函数：检测代理是否可用
 async function checkProxy() {
-    if (!PROXY_CONFIG) return true;
+    if (!PROXY_CONFIG) return false;
 
     console.log('[代理] 正在验证代理连接...');
-    try {
-        const axiosConfig = {
-            proxy: {
-                protocol: 'http',
-                host: new URL(PROXY_CONFIG.server).hostname,
-                port: new URL(PROXY_CONFIG.server).port,
-            },
-            timeout: 10000
-        };
-
-        if (PROXY_CONFIG.username && PROXY_CONFIG.password) {
-            axiosConfig.proxy.auth = {
-                username: PROXY_CONFIG.username,
-                password: PROXY_CONFIG.password
-            };
-        }
-
-        //await axios.get('https://www.google.com', axiosConfig);
-        console.log('[代理] 连接成功！');
-        return true;
-    } catch (error) {
-        console.error(`[代理] 连接失败: ${error.message}`);
-        return false;
-    }
+    return true
 }
 
 const checkTurnstile = ({ page }) => {
