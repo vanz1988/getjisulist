@@ -79,7 +79,7 @@ if (HTTP_PROXY) {
     }
 }
 
-let is_proxy_enableflag=await checkProxy()
+let is_proxy_enableflag=await checkProxy();
 
 if(is_proxy_enableflag){
     if (HTTP_PROXY) {
@@ -92,7 +92,6 @@ if(is_proxy_enableflag){
         }
     }
 }
-
 
 function parseList(envVal, defaultList) {
     if (!envVal) return [...defaultList];
@@ -137,6 +136,201 @@ async function sendTelegram(message, screenshotPath) {
         console.log(`⚠️ Telegram 发送失败: ${e.message}`);
     }
 }
+
+// ===================== 工具：通过 CDP 派发鼠标点击 =====================
+async function dispatchCdpClick(page, x, y) {
+    const client = await page.createCDPSession();
+    try {
+        await client.send('Input.dispatchMouseEvent', {
+            type: 'mousePressed',
+            x, y,
+            button: 'left',
+            clickCount: 1
+        });
+        await new Promise(r => setTimeout(r, 50 + Math.random() * 100));
+        await client.send('Input.dispatchMouseEvent', {
+            type: 'mouseReleased',
+            x, y,
+            button: 'left',
+            clickCount: 1
+        });
+        console.log(`>> CDP 点击 (${x.toFixed(2)}, ${y.toFixed(2)})`);
+        return true;
+    } catch (e) {
+        console.log('CDP 点击失败:', e.message);
+        return false;
+    } finally {
+        await client.detach().catch(() => {});
+    }
+}
+
+// ===================== Turnstile 检测与解决 =====================
+async function hasTurnstileFrame(page) {
+    try {
+        const frames = page.frames();
+        for (const f of frames) {
+            if (f.url().includes('challenges.cloudflare.com') || f.url().includes('turnstile')) {
+                return true;
+            }
+        }
+        const el = await page.$('iframe[src*="challenges.cloudflare.com"], iframe[src*="turnstile"]');
+        return !!el;
+    } catch { return false; }
+}
+
+async function checkTurnstileSuccess(page) {
+    try {
+        const token = await page.evaluate(() => {
+            const el = document.querySelector('input[name="cf-turnstile-response"], textarea[name="cf-turnstile-response"]');
+            return el ? el.value : '';
+        });
+        if (token && token.length > 20) return true;
+    } catch {}
+    const frames = page.frames();
+    for (const f of frames) {
+        if (f.url().includes('cloudflare')) {
+            try {
+                const visible = await f.evaluate(() => {
+                    const el = document.querySelector('.mark-success, [aria-label="Success"]');
+                    return el ? el.offsetParent !== null : false;
+                }).catch(() => false);
+                if (visible) return true;
+            } catch {}
+        }
+    }
+    return false;
+}
+
+async function attemptTurnstileCdp(page) {
+    const frames = page.frames();
+    for (const frame of frames) {
+        try {
+            const data = await frame.evaluate(() => window.__turnstile_data).catch(() => null);
+
+            if (data) {
+                console.log('>> 在 frame 中发现 Turnstile。比例:', data);
+
+                const iframeElement = frame.frameElement();
+                if (!iframeElement) continue;
+
+                const box = await iframeElement.boundingBox();
+                if (!box) continue;
+
+                const clickX = box.x + (box.width * data.xRatio);
+                const clickY = box.y + (box.height * data.yRatio);
+
+                console.log(`>> 计算点击坐标: (${clickX.toFixed(2)}, ${clickY.toFixed(2)})`);
+
+                const client = await page.createCDPSession();
+
+                await client.send('Input.dispatchMouseEvent', {
+                    type: 'mousePressed',
+                    x: clickX,
+                    y: clickY,
+                    button: 'left',
+                    clickCount: 1
+                });
+
+                await new Promise(r => setTimeout(r, 50 + Math.random() * 100));
+
+                await client.send('Input.dispatchMouseEvent', {
+                    type: 'mouseReleased',
+                    x: clickX,
+                    y: clickY,
+                    button: 'left',
+                    clickCount: 1
+                });
+
+                console.log('>> CDP 点击已发送。');
+                await client.detach();
+                return true;
+            }
+        } catch (e) { }
+    }
+    return false;
+}
+
+async function solveTurnstile(page, stageName = '爬虫', maxAttempts = 10, waitAfterClick = 5000) {
+    console.log(`[${stageName}] 开始检测 Turnstile...`);
+    let saw = false;
+    for (let i = 0; i < maxAttempts; i++) {
+        if (await hasTurnstileFrame(page)) saw = true;
+        if (await checkTurnstileSuccess(page)) {
+            console.log(`[${stageName}] ✅ Turnstile 已通过`);
+            return true;
+        }
+        const clicked = await attemptTurnstileCdp(page);
+        if (clicked) {
+            saw = true;
+            console.log(`[${stageName}] 点击了 Turnstile，等待 ${waitAfterClick}ms...`);
+            await sleep(waitAfterClick);
+            if (await checkTurnstileSuccess(page)) {
+                console.log(`[${stageName}] ✅ Turnstile 验证成功`);
+                return true;
+            }
+            console.log(`[${stageName}] ⚠️ 验证未通过，重试...`);
+        }
+        if (i < maxAttempts - 1) await sleep(1000);
+    }
+    if (!saw) {
+        console.log(`[${stageName}] 未检测到 Turnstile`);
+        return true;
+    }
+    console.log(`[${stageName}] ❌ Turnstile 处理超时`);
+    return false;
+}
+
+// ===================== 注入脚本（获取 Turnstile 复选框坐标） =====================
+const INJECT_SCRIPT = `
+(function() {
+    if (window.self === window.top) return;
+
+    try {
+        function getRandomInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+        let screenX = getRandomInt(800, 1200);
+        let screenY = getRandomInt(400, 600);
+        
+        Object.defineProperty(MouseEvent.prototype, 'screenX', { value: screenX });
+        Object.defineProperty(MouseEvent.prototype, 'screenY', { value: screenY });
+    } catch (e) { }
+
+    try {
+        const originalAttachShadow = Element.prototype.attachShadow;
+        
+        Element.prototype.attachShadow = function(init) {
+            const shadowRoot = originalAttachShadow.call(this, init);
+            
+            if (shadowRoot) {
+                const checkAndReport = () => {
+                    const checkbox = shadowRoot.querySelector('input[type="checkbox"]');
+                    if (checkbox) {
+                        const rect = checkbox.getBoundingClientRect();
+                        if (rect.width > 0 && rect.height > 0 && window.innerWidth > 0 && window.innerHeight > 0) {
+                            const xRatio = (rect.left + rect.width / 2) / window.innerWidth;
+                            const yRatio = (rect.top + rect.height / 2) / window.innerHeight;
+                            window.__turnstile_data = { xRatio, yRatio };
+                            return true;
+                        }
+                    }
+                    return false;
+                };
+
+                if (!checkAndReport()) {
+                    const observer = new MutationObserver(() => {
+                        if (checkAndReport()) observer.disconnect();
+                    });
+                    observer.observe(shadowRoot, { childList: true, subtree: true });
+                }
+            }
+            return shadowRoot;
+        };
+    } catch (e) {
+        console.error('[注入] Hook attachShadow 失败:', e);
+    }
+})();
+`;
 
 // 辅助函数：检测代理是否可用
 async function checkProxy() {
@@ -271,6 +465,7 @@ class JisuSpider {
                     launchOptions.geoip = true;
                 }
             }
+
 
             this.browser = await launch(launchOptions);
             console.log('- 驱动启动成功');
