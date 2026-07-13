@@ -79,6 +79,21 @@ if (HTTP_PROXY) {
     }
 }
 
+const is_proxy_enableflag = await checkProxy()
+
+if(is_proxy_enableflag){
+  
+  if (HTTP_PROXY) {
+      try {
+          const { ProxyAgent, setGlobalDispatcher } = require('undici');
+          setGlobalDispatcher(new ProxyAgent(HTTP_PROXY));
+          console.log(`✅ fetch 代理已启用: ${HTTP_PROXY}`);
+      } catch (e) {
+          console.warn(`⚠️ 无法加载 undici 代理模块，fetch 将直连: ${e.message}`);
+      }
+  }
+}
+
 
 function parseList(envVal, defaultList) {
     if (!envVal) return [...defaultList];
@@ -278,7 +293,7 @@ class JisuSpider {
                 args: launchArgs
             };
 
-           const is_proxy_enableflag = await checkProxy()
+
 
           if(is_proxy_enableflag){
             if (HTTP_PROXY) {
