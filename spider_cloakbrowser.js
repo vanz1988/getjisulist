@@ -391,6 +391,16 @@ class JisuSpider {
                     await sleep(1000);
                 }
             } else {
+
+                try {
+                    const cardElement = await this.page.$('.card-content-h1');
+                    if (cardElement) {
+                        console.log('   >> 登录前 Turnstile 验证成功。');
+                        isSuccess = true;
+                        break
+                    }
+                } catch (e) { }
+              
                 console.log('   >> 登录前未检测到或未点击 Turnstile，继续操作...');
             }
 
