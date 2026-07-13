@@ -352,7 +352,7 @@ async function checkProxy() {
             };
         }
 
-        await axios.get('https://www.google.com', axiosConfig);
+        //await axios.get('https://www.google.com', axiosConfig);
         console.log('[代理] 连接成功！');
         return true;
     } catch (error) {
