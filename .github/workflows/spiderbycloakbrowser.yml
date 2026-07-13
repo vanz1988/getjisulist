@@ -1,0 +1,63 @@
+name: Auto spider list
+
+on:  
+  schedule:
+    - cron: '11 6 */1 * *'
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  auto_spider_list_job:
+    runs-on: ubuntu-22.04
+
+    env:
+      BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+      CHAT_ID: ${{ secrets.CHAT_ID }}
+      TARGET_ACTORS: ${{ secrets.TARGET_ACTORS }}
+      PAGE_URLS: ${{ secrets.PAGE_URLS }}
+      TURNSTILE_URL: ${{ secrets.TURNSTILE_URL }}
+      HOST_URL: ${{ secrets.HOST_URL }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+          npm install
+          npx playwright install-deps chrome
+        
+      - name: ⚙ 设置代理 (sing-box)
+        continue-on-error: true
+        env:
+          NODE_LINK: ${{ secrets.NODE_LINK }}
+        run: |
+          bash <(wget -qO- https://main.ssss.nyc.mn/setup_proxy.sh)
+
+      - name: Run Renew Script
+        env:
+          # 将 USERS_JSON 配置在 GitHub Repository Secrets 中
+          # 格式: [{"username": "xxx", "password": "xxx"}, ...]
+          HTTP_PROXY: ${{ secrets.HTTP_PROXY }}
+        # 使用 xvfb-run 模拟有头环境运行
+        run: xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" node spider_ cloakbrowser.js
+
+      - name: Keep only last 8 runs total
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/${{ github.repository }}/actions/runs --paginate \
+            --jq '.workflow_runs | sort_by(.created_at) | reverse | .[8:][] | .id' \
+            | xargs -I {} gh api -X DELETE repos/${{ github.repository }}/actions/runs/{} --silent
+          
+          echo "✓ Kept latest 8 runs across all workflows"
