@@ -476,7 +476,9 @@ class JisuSpider {
 
             if (content.includes("challenge-platform") === true){
                 console.log('检测到码');
-                await checkTurnstile(this.page);
+                try {
+                    await checkTurnstile({ this.page });
+                } catch (err) { }
                 cdpClickResult=true
             }
 
