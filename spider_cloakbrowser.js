@@ -314,6 +314,53 @@ async function checkProxy() {
     }
 }
 
+const checkTurnstile = ({ page }) => {
+  return new Promise(async (resolve, reject) => {
+    var waitInterval = setTimeout(() => { clearInterval(waitInterval); resolve(false) }, 5000);
+    try {
+      let box = null;
+
+      try {
+        const wrapper = await page.$('div:has(> div > div > input[name="cf-turnstile-response"])');
+        if (wrapper) {
+          const rect = await wrapper.boundingBox();
+          if (rect && rect.width > 250 && rect.height > 40) {
+            box = rect;
+          }
+        }
+      } catch (err) {
+        logger.error(`${t.locError}${err.message}`);
+      }
+
+      if (box) {
+        logger.debug(`${t.locSuccess}x=${box.x.toFixed(1)}, y=${box.y.toFixed(1)}, w=${box.width.toFixed(1)}, h=${box.height.toFixed(1)}`);
+
+        await new Promise(r => setTimeout(r, Math.random() * 1000 + 1500));
+        
+        if (page.isClosed()) {
+          logger.debug(t.pageClosed);
+          clearInterval(waitInterval);
+          return resolve(false);
+        }
+
+        let x = box.x + 20 + (Math.random() * 6 - 3);
+        let y = box.y + 30 + (Math.random() * 6 - 3);
+        
+        logger.debug(`${t.clickPos}x=${x.toFixed(1)}, y=${y.toFixed(1)}`);
+
+        await page.mouse.click(x, y);
+      }
+      
+      clearInterval(waitInterval);
+      resolve(true);
+    } catch (err) {
+      clearInterval(waitInterval);
+      resolve(false);
+    }
+  });
+}
+
+
 // ===================== 爬虫核心类 =====================
 class JisuSpider {
     constructor() {
@@ -389,7 +436,7 @@ class JisuSpider {
         const pages = await this.browser.pages();
         this.page = pages.length > 0 ? pages[0] : await this.browser.newPage();
         await this.page.setViewport({ width: 1280, height: 720 });
-        await this.page.evaluateOnNewDocument(INJECT_SCRIPT);
+        //await this.page.evaluateOnNewDocument(INJECT_SCRIPT);
     }
 
     async buildSession() {
@@ -424,11 +471,16 @@ class JisuSpider {
         let isSuccess = false;
         let cdpClickResult = false;
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
-            for (let findAttempt = 0; findAttempt < 15; findAttempt++) {
-                cdpClickResult = await attemptTurnstileCdp(this.page);
-                if (cdpClickResult) break;
-                await sleep(1000);
+
+            const content = await page.content();
+
+            if (content.includes("challenge-platform") === true){
+                console.log('检测到码');
+                await checkTurnstile(this.page);
+                cdpClickResult=true
             }
+
+            
 
             if (cdpClickResult) {
                 console.log('   >> 登录 CDP 点击生效。正在等待最多 10秒 Cloudflare 成功标志...');
