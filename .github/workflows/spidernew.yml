@@ -13,10 +13,12 @@ jobs:
     runs-on: ubuntu-22.04
 
     env:
-      ACCOUNTS: ${{ secrets.ACCOUNTS }}
       BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
       CHAT_ID: ${{ secrets.CHAT_ID }}
-      ACCOUNTS_KATABUMP: ${{ secrets.ACCOUNTS_KATABUMP }}
+      TARGET_ACTORS: ${{ secrets.TARGET_ACTORS }}
+      PAGE_URLS: ${{ secrets.PAGE_URLS }}
+      TURNSTILE_URL: ${{ secrets.TURNSTILE_URL }}
+      HOST_URL: ${{ secrets.HOST_URL }}
 
     steps:
       - name: Checkout repository
