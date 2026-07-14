@@ -41,7 +41,7 @@ HOST_URL = base64.b64decode(encoded_url).decode('utf-8')
 CHROME_BINARY = os.getenv('CHROME_BINARY', '/home/runner/.ysbrowser/chromium-140.0.7339.133/opt/chromium.org/chromium-unstable/chromium-browser-unstable')
 CHROMEDRIVER_PATH = os.getenv('CHROMEDRIVER_PATH', '/home/runner/.ysbrowser/chromium-140.0.7339.133/opt/chromium.org/chromium-unstable/chromedriver')
 USER_DATA_DIR = os.getenv('USER_DATA_DIR', '/tmp/ysbrowser_profile')
-FP_SEED = os.getenv('FP_SEED', '12lfbsffwfaTYa')
+FP_SEED = os.getenv('FP_SEED', '12lfisffwfaTYa')
 TIMEZONE = os.getenv('TIMEZONE', 'Asia/Hong_Kong')
 LANG = os.getenv('LANG', 'zh-CN')
 ACCEPT_LANG = os.getenv('ACCEPT_LANG', 'zh-CN,en')
@@ -264,16 +264,16 @@ class JisuSpider:
             self._build_session()
             return True
 
-        for i in range(max_attempts):
-            logger.info(f"等待 TurnstileClicker 自动过码，第 {i+1} 次轮询...")
-            if self._find_optional((By.CSS_SELECTOR, '.card-content-h1'), timeout=10):
-                logger.info("TurnstileClicker 自动打码成功！")
-                self._build_session()
-                return True
+        #for i in range(max_attempts):
+        #    logger.info(f"等待 TurnstileClicker 自动过码，第 {i+1} 次轮询...")
+        #    if self._find_optional((By.CSS_SELECTOR, '.card-content-h1'), timeout=10):
+        #        logger.info("TurnstileClicker 自动打码成功！")
+        #        self._build_session()
+        #        return True
 
-            logger.info(f"第 {i+1} 次等待未通过，重试...")
+        #    logger.info(f"第 {i+1} 次等待未通过，重试...")
 
-        logger.warning(f"TurnstileClicker 自动打码失败，已尝试 {max_attempts} 次，回退手动打码")
+        #logger.warning(f"TurnstileClicker 自动打码失败，已尝试 {max_attempts} 次，回退手动打码")
         for i in range(max_attempts):
             logger.info(f"手动打码第 {i+1} 次尝试...")
             self._handle_turnstile(f"ManualPass-{i+1}")
