@@ -252,49 +252,147 @@ class JisuSpider:
             logger.error(f"❌  - [{context}] 验证交互失败: {e}")
             return False
 
+    def _diagnose_turnstile(self):
+        try:
+            info = self.driver.execute_script("""
+                var result = {};
+                // 主框架里的 iframe 信息
+                var iframes = document.querySelectorAll('iframe');
+                result.iframe_count = iframes.length;
+                result.iframes = [];
+                for (var i = 0; i < iframes.length; i++) {
+                    var f = iframes[i];
+                    result.iframes.push({
+                        src: f.src || '',
+                        id: f.id || '',
+                        className: f.className || '',
+                        width: f.width, height: f.height
+                    });
+                }
+                // 主框架里有 opshadowRoot 的元素
+                var allEls = document.querySelectorAll('*');
+                var shadowHosts = [];
+                for (var i = 0; i < allEls.length; i++) {
+                    if (allEls[i].opshadowRoot) {
+                        shadowHosts.push({
+                            tag: allEls[i].tagName,
+                            id: allEls[i].id,
+                            className: allEls[i].className,
+                            childCount: allEls[i].opshadowRoot.childNodes.length
+                        });
+                    }
+                }
+                result.shadow_hosts_in_main = shadowHosts;
+                result.shadow_hosts_count = shadowHosts.length;
+                return result;
+            """)
+            logger.info(f"🔍 诊断-主框架: iframe数={info.get('iframe_count')}, "
+                        f"opshadowRoot宿主数={info.get('shadow_hosts_count')}")
+            for iframe_info in info.get('iframes', []):
+                logger.info(f"  📦 iframe: src={iframe_info.get('src','')[:80]}, "
+                            f"id={iframe_info.get('id','')}, class={iframe_info.get('className','')}")
+            for sh in info.get('shadow_hosts_in_main', []):
+                logger.info(f"  🌑 shadow宿主: <{sh.get('tag')}> id={sh.get('id','')}, "
+                            f"class={sh.get('className','')}, childNodes={sh.get('childCount')}")
+        except Exception as e:
+            logger.warning(f"诊断主框架失败: {e}")
+
+        try:
+            iframes = self.driver.find_elements(By.TAG_NAME, 'iframe')
+            for idx, iframe_el in enumerate(iframes):
+                src = iframe_el.get_attribute('src') or ''
+                if 'challenges.cloudflare.com' in src or 'turnstile' in src.lower():
+                    logger.info(f"🔍 切入 CF iframe[{idx}]: {src[:100]}")
+                    self.driver.switch_to.frame(iframe_el)
+                    iframe_info = self.driver.execute_script("""
+                        var result = {};
+                        var allEls = document.querySelectorAll('*');
+                        result.total_elements = allEls.length;
+                        result.body_html_length = document.body ? document.body.innerHTML.length : 0;
+                        var shadowHosts = [];
+                        for (var i = 0; i < allEls.length; i++) {
+                            if (allEls[i].opshadowRoot) {
+                                var sr = allEls[i].opshadowRoot;
+                                var inner = sr.innerHTML ? sr.innerHTML.substring(0, 200) : '';
+                                shadowHosts.push({
+                                    tag: allEls[i].tagName,
+                                    id: allEls[i].id || '',
+                                    className: allEls[i].className || '',
+                                    innerPreview: inner
+                                });
+                            }
+                        }
+                        result.shadow_hosts = shadowHosts;
+                        result.shadow_hosts_count = shadowHosts.length;
+                        // 也检查 checkbox / button
+                        result.checkboxes = document.querySelectorAll('input[type="checkbox"]').length;
+                        result.buttons = document.querySelectorAll('button').length;
+                        return result;
+                    """)
+                    logger.info(f"🔍 诊断-CF iframe内部: 元素数={iframe_info.get('total_elements')}, "
+                                f"HTML长度={iframe_info.get('body_html_length')}, "
+                                f"checkbox数={iframe_info.get('checkboxes')}, "
+                                f"button数={iframe_info.get('buttons')}, "
+                                f"opshadowRoot宿主数={iframe_info.get('shadow_hosts_count')}")
+                    for sh in iframe_info.get('shadow_hosts', []):
+                        logger.info(f"    🌑 shadow宿主: <{sh.get('tag')}> id={sh.get('id','')}, "
+                                    f"class={sh.get('className','')}, inner预览={sh.get('innerPreview','')[:100]}")
+                    self.driver.switch_to.default_content()
+                    return
+            logger.info("🔍 未找到 CF iframe")
+        except Exception as e:
+            self.driver.switch_to.default_content()
+            logger.warning(f"诊断 CF iframe 失败: {e}")
+
     def _handle_turnstile_via_opshadow(self, context=""):
         try:
-            container = WebDriverWait(self.driver, 15).until(
-                EC.visibility_of_element_located(
-                    (By.XPATH, "//div[contains(@style, 'display: grid') and .//input[@name='cf-turnstile-response']]")
-                )
-            )
+            self._diagnose_turnstile()
+
+            iframes = self.driver.find_elements(By.TAG_NAME, 'iframe')
+            cf_iframe = None
+            for iframe_el in iframes:
+                src = iframe_el.get_attribute('src') or ''
+                if 'challenges.cloudflare.com' in src or 'turnstile' in src.lower():
+                    cf_iframe = iframe_el
+                    break
+
+            if not cf_iframe:
+                logger.warning(f"🖱️ - [{context}] 未找到 CF Turnstile iframe")
+                return False
+
+            self.driver.switch_to.frame(cf_iframe)
 
             result = self.driver.execute_script("""
-                var el = arguments[0];
-                // 遍历子元素找 closed shadow root
-                var shadows = el.querySelectorAll('*');
-                for (var i = 0; i < shadows.length; i++) {
-                    var shadow = shadows[i].opshadowRoot;
-                    if (shadow) {
-                        // 找到 checkbox 并点击
-                        var checkbox = shadow.querySelector('input[type="checkbox"]');
+                var allEls = document.querySelectorAll('*');
+                for (var i = 0; i < allEls.length; i++) {
+                    var sr = allEls[i].opshadowRoot;
+                    if (sr) {
+                        var checkbox = sr.querySelector('input[type="checkbox"]');
                         if (checkbox) {
                             checkbox.click();
-                            return 'clicked_checkbox';
+                            return 'clicked_checkbox_in_shadow';
                         }
-                        // 有些版本是 button
-                        var btn = shadow.querySelector('button');
+                        var btn = sr.querySelector('button');
                         if (btn) {
                             btn.click();
-                            return 'clicked_button';
+                            return 'clicked_button_in_shadow';
                         }
                     }
                 }
-                // 也可能 shadow root 在 container 自身
-                var rootShadow = el.opshadowRoot;
-                if (rootShadow) {
-                    var cb = rootShadow.querySelector('input[type="checkbox"]');
-                    if (cb) { cb.click(); return 'clicked_root_checkbox'; }
-                    var b = rootShadow.querySelector('button');
-                    if (b) { b.click(); return 'clicked_root_button'; }
-                }
-                return 'not_found';
-            """, container)
+                // iframe 内无 shadow DOM 时，直接找 checkbox
+                var cb = document.querySelector('input[type="checkbox"]');
+                if (cb) { cb.click(); return 'clicked_checkbox_direct'; }
+                var b = document.querySelector('button');
+                if (b) { b.click(); return 'clicked_button_direct'; }
 
+                return 'not_found';
+            """)
+
+            self.driver.switch_to.default_content()
             logger.info(f"🖱️ - [{context}] opshadowRoot 结果: {result}")
             return result != 'not_found'
         except Exception as e:
+            self.driver.switch_to.default_content()
             logger.error(f"❌ - [{context}] opshadowRoot 访问失败: {e}")
             return False
 
