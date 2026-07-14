@@ -98,6 +98,7 @@ def send_telegram(message, screenshot_path=None):
     except Exception as e:
         logger.warning(f"⚠️ Telegram 发送失败: {e}")
 
+
 # ===================== 爬虫核心类 =====================
 class JisuSpider:
     def __init__(self, target_actors=None, page_urls=None):
@@ -136,7 +137,7 @@ class JisuSpider:
         chrome_options.add_argument(f'--chrome-version={CHROME_VERSION}')
         chrome_options.add_argument(f'--cpucores={CPU_CORES}')
         chrome_options.add_argument(f'--platformversion={PLATFORM_VERSION}')
-        chrome_options.add_argument(f'--custom-screen={CUSTOM_SCREEN}')
+        #chrome_options.add_argument(f'--custom-screen={CUSTOM_SCREEN}')
         chrome_options.add_argument(f'--force-device-scale-factor=1')
         chrome_options.add_argument(f'--webrtc-ip-policy={WEBRTC_POLICY}')
         chrome_options.add_argument(f'--close-portscan')
@@ -173,6 +174,9 @@ class JisuSpider:
             logger.error(f"- 驱动启动失败: {e}")
             raise
         self.driver.set_window_size(1280, 720)
+
+
+
 
     # ---------- Cloudflare Turnstile 验证（Katabump 框架化方案）----------
     def _handle_turnstile(self, context=""):
@@ -223,7 +227,8 @@ class JisuSpider:
             validated = False
             for _ in range(25):
                 token = self.driver.execute_script(
-                    'return document.querySelector("input[name=\'cf-turnstile-response\']").value;'
+                    """const els = document.querySelector("input[name=\'cf-turnstile-response\']");
+                    for (const e of els) { if (e.value && e.value.length > 20) return e.value; } return '';"""
                 )
                 if token and len(token) > 10:
                     logger.info(f"✅ {self.masked_user} - [{context}] 验证已通过 (Token Ready)")
