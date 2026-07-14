@@ -143,7 +143,7 @@ class JisuSpider:
         chrome_options.add_argument(f'--user-data-dir={USER_DATA_DIR}')
 
         # 内置自动过 Cloudflare Turnstile + PX 验证码
-        chrome_options.add_argument('--enable-features=TurnstileClicker,PXAutoHold')
+        #chrome_options.add_argument('--enable-features=TurnstileClicker,PXAutoHold')
 
         if PROXY_SERVER:
             chrome_options.add_argument(f'--proxy-server={PROXY_SERVER}')
@@ -225,19 +225,19 @@ class JisuSpider:
             for _ in range(10):
                 token = self.driver.execute_script("""
                     function queryDeep(selector, root = document) {
-                    const result = [];
-                    const search = (node) => {
-                    for (const el of node.querySelectorAll(selector)) result.push(el);
-                    for (const el of node.querySelectorAll('*')) {
-                    if (el.shadowRoot) search(el.shadowRoot);
-                    }
-                    };
-                    search(root);
-                    return result;
+                        const result = [];
+                        const search = (node) => {
+                            for (const el of node.querySelectorAll(selector)) result.push(el);
+                            for (const el of node.querySelectorAll('*')) {
+                                if (el.shadowRoot) search(el.shadowRoot);
+                            }
+                        };
+                        search(root);
+                        return result;
                     }
                     const els = queryDeep('input[name="cf-turnstile-response"]');
                     for (const el of els) {
-                    if (el.value && el.value.length > 0) return el.value;
+                        if (el.value && el.value.length > 0) return el.value;
                     }
                     return '';
                 """)
@@ -250,6 +250,52 @@ class JisuSpider:
             return validated
         except Exception as e:
             logger.error(f"❌  - [{context}] 验证交互失败: {e}")
+            return False
+
+    def _handle_turnstile_via_opshadow(self, context=""):
+        try:
+            container = WebDriverWait(self.driver, 15).until(
+                EC.presence_of_element_located(
+                    (By.XPATH, "//div[.//input[@name='cf-turnstile-response']]")
+                )
+            )
+
+            result = self.driver.execute_script("""
+                var el = arguments[0];
+                // 遍历子元素找 closed shadow root
+                var shadows = el.querySelectorAll('*');
+                for (var i = 0; i < shadows.length; i++) {
+                    var shadow = shadows[i].opshadowRoot;
+                    if (shadow) {
+                        // 找到 checkbox 并点击
+                        var checkbox = shadow.querySelector('input[type="checkbox"]');
+                        if (checkbox) {
+                            checkbox.click();
+                            return 'clicked_checkbox';
+                        }
+                        // 有些版本是 button
+                        var btn = shadow.querySelector('button');
+                        if (btn) {
+                            btn.click();
+                            return 'clicked_button';
+                        }
+                    }
+                }
+                // 也可能 shadow root 在 container 自身
+                var rootShadow = el.opshadowRoot;
+                if (rootShadow) {
+                    var cb = rootShadow.querySelector('input[type="checkbox"]');
+                    if (cb) { cb.click(); return 'clicked_root_checkbox'; }
+                    var b = rootShadow.querySelector('button');
+                    if (b) { b.click(); return 'clicked_root_button'; }
+                }
+                return 'not_found';
+            """, container)
+
+            logger.info(f"🖱️ - [{context}] opshadowRoot 结果: {result}")
+            return result != 'not_found'
+        except Exception as e:
+            logger.error(f"❌ - [{context}] opshadowRoot 访问失败: {e}")
             return False
 
     def _find_optional(self, locator, timeout=5):
@@ -298,7 +344,7 @@ class JisuSpider:
         #logger.warning(f"TurnstileClicker 自动打码失败，已尝试 {max_attempts} 次，回退手动打码")
         for i in range(max_attempts):
             logger.info(f"手动打码第 {i+1} 次尝试...")
-            self._handle_turnstile(f"ManualPass-{i+1}")
+            self._handle_turnstile_via_opshadow(f"ManualPass-{i+1}")
 
             if self._find_optional((By.CSS_SELECTOR, '.card-content-h1'), timeout=8):
                 logger.info("手动打码成功！")
