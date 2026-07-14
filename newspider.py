@@ -380,8 +380,14 @@ class JisuSpider:
 
         # 打码完成后关闭浏览器，后续用 requests 跑
         if self.driver:
+            self.screenshot_path = "error-spider.png"
+            try:
+                self.driver.save_screenshot(self.screenshot_path)
+            except Exception as e:
+                logger.warning(f"截图失败: {e}")
             self.driver.quit()
             self.driver = None
+
             return False, "打码失败"
 
         all_dramas = []
