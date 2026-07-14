@@ -98,7 +98,6 @@ def send_telegram(message, screenshot_path=None):
     except Exception as e:
         logger.warning(f"⚠️ Telegram 发送失败: {e}")
 
-
 # ===================== 爬虫核心类 =====================
 class JisuSpider:
     def __init__(self, target_actors=None, page_urls=None):
@@ -137,7 +136,7 @@ class JisuSpider:
         chrome_options.add_argument(f'--chrome-version={CHROME_VERSION}')
         chrome_options.add_argument(f'--cpucores={CPU_CORES}')
         chrome_options.add_argument(f'--platformversion={PLATFORM_VERSION}')
-        #chrome_options.add_argument(f'--custom-screen={CUSTOM_SCREEN}')
+        chrome_options.add_argument(f'--custom-screen={CUSTOM_SCREEN}')
         chrome_options.add_argument(f'--force-device-scale-factor=1')
         chrome_options.add_argument(f'--webrtc-ip-policy={WEBRTC_POLICY}')
         chrome_options.add_argument(f'--close-portscan')
@@ -174,9 +173,6 @@ class JisuSpider:
             logger.error(f"- 驱动启动失败: {e}")
             raise
         self.driver.set_window_size(1280, 720)
-
-
-
 
     # ---------- Cloudflare Turnstile 验证（Katabump 框架化方案）----------
     def _handle_turnstile(self, context=""):
@@ -225,18 +221,6 @@ class JisuSpider:
             
             # 轮询检查 Token
             validated = False
-            for _ in range(25):
-                token = self.driver.execute_script("""
-                    const els = document.querySelectorAll("input[name=\'cf-turnstile-response\']");
-                    for (const e of els) { if (e.value && e.value.length > 20) return e.value; } return '';
-                    """
-                )
-                if token and len(token) > 10:
-                    logger.info(f"✅ {self.masked_user} - [{context}] 验证已通过 (Token Ready)")
-                    sleep(1500 + random.random() * 1000)
-                    validated = True
-                    break
-                sleep(500)
             return validated
         except Exception as e:
             logger.error(f"❌  - [{context}] 验证交互失败: {e}")
@@ -396,8 +380,14 @@ class JisuSpider:
 
         # 打码完成后关闭浏览器，后续用 requests 跑
         if self.driver:
+            self.screenshot_path = "error-spider.png"
+            try:
+                self.driver.save_screenshot(self.screenshot_path)
+            except Exception as e:
+                logger.warning(f"截图失败: {e}")
             self.driver.quit()
             self.driver = None
+
             return False, "打码失败"
 
         all_dramas = []
