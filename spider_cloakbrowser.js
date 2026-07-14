@@ -245,7 +245,8 @@ class JisuSpider {
                     launchArgs.push(`--fingerprint-brand=Chrome`);
                 }
             }
-
+            launchArgs.push(`--fingerprint=72648`);
+          
             const launchOptions = {
                 headless: false,
                 humanize: true,
