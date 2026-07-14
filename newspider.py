@@ -105,34 +105,30 @@ class JisuSpider:
 
             logger.info("✅  - 找到元素了")
 
-            size = container.rect.size
-            base_offset_x = -(size[0] / 2) + (size[0] * 0.044)
-            rand_x = base_offset_x + random.uniform(-5, 5)
-            rand_y = random.uniform(-5, 5)
+            page = self.browser.get_tabs()[-1]
+            challengeSolution = page.ele("@name=cf-turnstile-response")
+            challengeWrapper = challengeSolution.parent()
+            challengeIframe = challengeWrapper.shadow_root.ele("tag:iframe")
+            
+            challengeIframe.run_js("""
+window.dtp = 1
+function getRandomInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
 
-            logger.info(f"🖱️ - [{context}] 找到窗口")
+// old method wouldn't work on 4k screens
 
-            rect = container.rect
-            center_x = rect.location[0] + rect.size[0] / 2
-            center_y = rect.location[1] + rect.size[1] / 2
-            click_x = center_x + rand_x
-            click_y = center_y + rand_y
+let screenX = getRandomInt(800, 1200);
+let screenY = getRandomInt(400, 600);
 
-            click_x = round(click_x)
-            click_y = round(click_y)
+Object.defineProperty(MouseEvent.prototype, 'screenX', { value: screenX });
 
-
-
-            logger.info(f"🖱️ - [{context}] 焦点马上点击")
-
-            actions = self.tab.actions
-            actions.move_to((click_x, click_y))
-            time.sleep(random.uniform(0.5, 0.8))
-            actions.hold()
-            time.sleep(random.uniform(0.1, 0.25))
-            actions.release()
-
-            logger.info(f"🖱️ - [{context}] 执行偏移点击...{click_x},{click_y}")
+Object.defineProperty(MouseEvent.prototype, 'screenY', { value: screenY });
+                        """)
+            
+            challengeIframeBody = challengeIframe.ele("tag:body").shadow_root
+            challengeButton = challengeIframeBody.ele("tag:input")
+            challengeButton.click()
 
             validated = False
             return validated
@@ -162,7 +158,11 @@ class JisuSpider:
         logger.info(f"已构建 requests 会话，cookies: {len(cookies)} 个")
 
     def _pass_turnstile(self, url, max_attempts=5):
-        self.tab.get(url)
+
+
+        page = self.browser.get_tabs()[-1]
+        page.get(url)
+
         sleep(3000 + random.random() * 1000)
 
         if self._find_optional('css:.card-content-h1', timeout=5):
