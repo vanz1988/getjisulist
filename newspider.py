@@ -273,7 +273,7 @@ class JisuSpider:
         if not self.tab:
             self.setup_driver()
 
-        if not self._pass_turnstile(TURNSTILE_URL):
+        if not self._pass_turnstile("https://www.jisuzy.com/index.php/vod/search.html?wd=2"):
             return False, "❌ Cloudflare 打码失败"
 
         if self.browser:
