@@ -254,8 +254,10 @@ class JisuSpider {
 
             if (HTTP_PROXY&&is_proxy_enable) {
                 launchOptions.proxy = HTTP_PROXY;
-                launchOptions.geoip = true;
+                
             }
+
+            launchOptions.geoip = true;
 
             this.browser = await launch(launchOptions);
             console.log('- 驱动启动成功');
