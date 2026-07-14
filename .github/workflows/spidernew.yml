@@ -34,19 +34,13 @@ jobs:
           pip install -r requirements.txt
           sudo apt-get update && sudo apt-get install -y xvfb
 
-      - name: Get Chromium Version
-        id: get_version
+      - name: Download YSBrowser from my backup
         run: |
-          CHROME_VERSION=$(chromium-browser --version 2>/dev/null | grep -oE 'Chromium\s[0-9]+' | grep -oE '[0-9]+')
-          if [ -z "$CHROME_VERSION" ]; then
-            CHROME_VERSION=$(google-chrome --version 2>/dev/null | grep -oE 'Chrome\s[0-9]+' | grep -oE '[0-9]+')
-          fi
-          if [ -z "$CHROME_VERSION" ]; then
-            echo "⚠️ 无法自动检测浏览器版本，使用最新稳定版本。"
-          CHROME_VERSION="144"
-          fi
-          echo "Detected Chrome/Chromium Major Version: $CHROME_VERSION"
-          echo "CHROME_VERSION=$CHROME_VERSION" >> $GITHUB_ENV
+          mkdir -p /home/runner/.ysbrowser/chromium-140.0.7339.133
+          wget https://github.com/vanz1988/getjisulist/releases/download/v140.0.7339.133/ysbrowser-bundle.tar.gz
+          tar -xzf ysbrowser-bundle.tar.gz -C /home/runner/.ysbrowser/chromium-140.0.7339.133/
+          chmod +x /home/runner/.ysbrowser/chromium-140.0.7339.133/opt/chromium.org/chromium-unstable/chromium-browser-unstable
+          chmod +x /home/runner/.ysbrowser/chromium-140.0.7339.133/opt/chromium.org/chromium-unstable/chromedriver
 
       - name: Start X Virtual Frame Buffer (Xvfb)
         # 在后台启动 Xvfb，创建一个虚拟屏幕 :99
