@@ -206,10 +206,6 @@ class JisuSpider:
             click_x = round(click_x)
             click_y = round(click_y)
 
-            self.driver.execute_script("arguments[0].focus();", container)
-
-            sleep(500)
-
             logger.info(f"🖱️ - [{context}] 焦点马上点击")
 
             actions = ActionChains(self.driver)
@@ -386,6 +382,7 @@ class JisuSpider:
         if self.driver:
             self.driver.quit()
             self.driver = None
+            return True, "❌ Cloudflare 打码成功"
 
         all_dramas = []
         for page_url in self.page_urls:
