@@ -270,14 +270,16 @@ class JisuSpider:
         #    logger.info(f"第 {i+1} 次等待未通过，重试...")
 
         #logger.warning(f"TurnstileClicker 自动打码失败，已尝试 {max_attempts} 次，回退手动打码")
-        for i in range(max_attempts):
-            logger.info(f"手动打码第 {i+1} 次尝试...")
-            self._handle_turnstile(f"ManualPass-{i+1}")
+        #for i in range(max_attempts):
+        #    logger.info(f"手动打码第 {i+1} 次尝试...")
+        #    self._handle_turnstile(f"ManualPass-{i+1}")
 
-            if self._find_optional((By.CSS_SELECTOR, '.card-content-h1'), timeout=8):
-                logger.info("手动打码成功！")
-                self._build_session()
-                return True
+        #    if self._find_optional((By.CSS_SELECTOR, '.card-content-h1'), timeout=8):
+        #        logger.info("手动打码成功！")
+        #        self._build_session()
+        #        return True
+
+         sleep(33000 + random.random() * 1000)
 
         logger.warning(f"所有打码方式失败，已尝试 {max_attempts * 2} 次")
         return False
