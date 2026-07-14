@@ -44,7 +44,7 @@ USER_DATA_DIR = os.getenv('USER_DATA_DIR', '/tmp/ysbrowser_profile')
 FP_SEED = os.getenv('FP_SEED', '12lfisffwfaTYa')
 TIMEZONE = os.getenv('TIMEZONE', 'Asia/Hong_Kong')
 LANG = os.getenv('LANG', 'zh-CN')
-ACCEPT_LANG = os.getenv('ACCEPT_LANG', 'en')
+ACCEPT_LANG = os.getenv('ACCEPT_LANG', 'zh-CN,en')
 PROXY_AUTH = os.getenv('PROXY_AUTH', '')
 WEBRTC_POLICY = os.getenv('WEBRTC_POLICY', 'disabled')
 WEBRTC_PROXY_IP = os.getenv('WEBRTC_PROXY_IP', '')
@@ -221,6 +221,36 @@ class JisuSpider:
             
             # 轮询检查 Token
             validated = False
+            for _ in range(40):
+                token = self.driver.execute_script("""
+                    function queryDeep(selector, root = document) {
+                        const result = [];
+                        const search = (node) => {
+                            for (const el of node.querySelectorAll(selector)) result.push(el);
+                            for (const el of node.querySelectorAll('*')) {
+                                if (el.shadowRoot) search(el.shadowRoot);
+                            }
+                        };
+                        search(root);
+                        return result;
+                    }
+                    const els = queryDeep('input[name="cf-turnstile-response"]');
+                    for (const el of els) {
+                        if (el.value && el.value.length > 0) return el.value;
+                    }
+                    return '';
+                """)
+    
+                if token:
+                    logger.info(
+                        f"✅ {self.masked_user} - [{context}] 验证通过"
+                    )
+                    sleep(2000)
+                    return True
+    
+                sleep(500)
+
+            
             return validated
         except Exception as e:
             logger.error(f"❌  - [{context}] 验证交互失败: {e}")
@@ -387,7 +417,6 @@ class JisuSpider:
                 logger.warning(f"截图失败: {e}")
             self.driver.quit()
             self.driver = None
-
 
         all_dramas = []
         for page_url in self.page_urls:
