@@ -43,8 +43,8 @@ CHROMEDRIVER_PATH = os.getenv('CHROMEDRIVER_PATH', '/home/runner/.ysbrowser/chro
 USER_DATA_DIR = os.getenv('USER_DATA_DIR', '/tmp/ysbrowser_profile')
 FP_SEED = os.getenv('FP_SEED', '12lfisffwfaTYa')
 TIMEZONE = os.getenv('TIMEZONE', 'Asia/Hong_Kong')
-LANG = os.getenv('LANG', 'zh-CN')
-ACCEPT_LANG = os.getenv('ACCEPT_LANG', 'zh-CN,en')
+LANG = os.getenv('LANG', 'en')
+ACCEPT_LANG = os.getenv('ACCEPT_LANG', 'en')
 PROXY_AUTH = os.getenv('PROXY_AUTH', '')
 WEBRTC_POLICY = os.getenv('WEBRTC_POLICY', 'disabled')
 WEBRTC_PROXY_IP = os.getenv('WEBRTC_PROXY_IP', '')
@@ -119,31 +119,31 @@ class JisuSpider:
         chrome_options.add_argument('--nocrash')
 
         # YSbrowser 指纹与反检测参数
-        #chrome_options.add_argument(f'--fpseed={FP_SEED}')
-        #chrome_options.add_argument(f'--webgl-seed={FP_SEED}')
-        #chrome_options.add_argument(f'--canvas-seed={FP_SEED}')
-        #chrome_options.add_argument(f'--quota-seed={FP_SEED}')
-        #chrome_options.add_argument(f'--css-seed={FP_SEED}')
-        #chrome_options.add_argument(f'--font-seed={FP_SEED}')
-        #chrome_options.add_argument(f'--audio-seed={FP_SEED}')
-        #chrome_options.add_argument(f'--svg-seed={FP_SEED}')
-        #chrome_options.add_argument(f'--speech-seed={FP_SEED}')
-        #chrome_options.add_argument(f'--rect-seed={FP_SEED}')
-        #chrome_options.add_argument(f'--gpu-seed={FP_SEED}')
-        #chrome_options.add_argument(f'--timezone={TIMEZONE}')
-        #chrome_options.add_argument(f'--lang={LANG}')
-        #chrome_options.add_argument(f'--accept-lang={ACCEPT_LANG}')
-        #chrome_options.add_argument(f'--chrome-version={CHROME_VERSION}')
-        #chrome_options.add_argument(f'--cpucores={CPU_CORES}')
-        #chrome_options.add_argument(f'--platformversion={PLATFORM_VERSION}')
-        #chrome_options.add_argument(f'--custom-screen={CUSTOM_SCREEN}')
-        #chrome_options.add_argument(f'--force-device-scale-factor=1')
-        #chrome_options.add_argument(f'--webrtc-ip-policy={WEBRTC_POLICY}')
-        #chrome_options.add_argument(f'--close-portscan')
+        chrome_options.add_argument(f'--fpseed={FP_SEED}')
+        chrome_options.add_argument(f'--webgl-seed={FP_SEED}')
+        chrome_options.add_argument(f'--canvas-seed={FP_SEED}')
+        chrome_options.add_argument(f'--quota-seed={FP_SEED}')
+        chrome_options.add_argument(f'--css-seed={FP_SEED}')
+        chrome_options.add_argument(f'--font-seed={FP_SEED}')
+        chrome_options.add_argument(f'--audio-seed={FP_SEED}')
+        chrome_options.add_argument(f'--svg-seed={FP_SEED}')
+        chrome_options.add_argument(f'--speech-seed={FP_SEED}')
+        chrome_options.add_argument(f'--rect-seed={FP_SEED}')
+        chrome_options.add_argument(f'--gpu-seed={FP_SEED}')
+        chrome_options.add_argument(f'--timezone={TIMEZONE}')
+        chrome_options.add_argument(f'--lang={LANG}')
+        chrome_options.add_argument(f'--accept-lang={ACCEPT_LANG}')
+        chrome_options.add_argument(f'--chrome-version={CHROME_VERSION}')
+        chrome_options.add_argument(f'--cpucores={CPU_CORES}')
+        chrome_options.add_argument(f'--platformversion={PLATFORM_VERSION}')
+        chrome_options.add_argument(f'--custom-screen={CUSTOM_SCREEN}')
+        chrome_options.add_argument(f'--force-device-scale-factor=1')
+        chrome_options.add_argument(f'--webrtc-ip-policy={WEBRTC_POLICY}')
+        chrome_options.add_argument(f'--close-portscan')
         chrome_options.add_argument(f'--user-data-dir={USER_DATA_DIR}')
 
         # 内置自动过 Cloudflare Turnstile + PX 验证码
-        #chrome_options.add_argument('--enable-features=TurnstileClicker,PXAutoHold')
+        chrome_options.add_argument('--enable-features=TurnstileClicker,PXAutoHold')
 
         if PROXY_SERVER:
             chrome_options.add_argument(f'--proxy-server={PROXY_SERVER}')
@@ -221,6 +221,16 @@ class JisuSpider:
             
             # 轮询检查 Token
             validated = False
+            for _ in range(25):
+                token = self.driver.execute_script(
+                    'return document.querySelector("input[name=\'cf-turnstile-response\']").value;'
+                )
+                if token and len(token) > 10:
+                    logger.info(f"✅ {self.masked_user} - [{context}] 验证已通过 (Token Ready)")
+                    sleep(1500 + random.random() * 1000)
+                    validated = True
+                    break
+                sleep(500)
             return validated
         except Exception as e:
             logger.error(f"❌  - [{context}] 验证交互失败: {e}")
@@ -270,7 +280,14 @@ class JisuSpider:
         #    logger.info(f"第 {i+1} 次等待未通过，重试...")
 
         #logger.warning(f"TurnstileClicker 自动打码失败，已尝试 {max_attempts} 次，回退手动打码")
+        for i in range(max_attempts):
+            logger.info(f"手动打码第 {i+1} 次尝试...")
+            self._handle_turnstile(f"ManualPass-{i+1}")
 
+            if self._find_optional((By.CSS_SELECTOR, '.card-content-h1'), timeout=8):
+                logger.info("手动打码成功！")
+                self._build_session()
+                return True
 
         logger.warning(f"所有打码方式失败，已尝试 {max_attempts * 2} 次")
         return False
@@ -375,7 +392,6 @@ class JisuSpider:
         if self.driver:
             self.driver.quit()
             self.driver = None
-
             return False, "打码失败"
 
         all_dramas = []
