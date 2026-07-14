@@ -221,36 +221,6 @@ class JisuSpider:
             
             # 轮询检查 Token
             validated = False
-            for _ in range(40):
-                token = self.driver.execute_script("""
-                    function queryDeep(selector, root = document) {
-                        const result = [];
-                        const search = (node) => {
-                            for (const el of node.querySelectorAll(selector)) result.push(el);
-                            for (const el of node.querySelectorAll('*')) {
-                                if (el.shadowRoot) search(el.shadowRoot);
-                            }
-                        };
-                        search(root);
-                        return result;
-                    }
-                    const els = queryDeep('input[name="cf-turnstile-response"]');
-                    for (const el of els) {
-                        if (el.value && el.value.length > 0) return el.value;
-                    }
-                    return '';
-                """)
-    
-                if token:
-                    logger.info(
-                        f"✅ {self.masked_user} - [{context}] 验证通过"
-                    )
-                    sleep(2000)
-                    return True
-    
-                sleep(500)
-
-            
             return validated
         except Exception as e:
             logger.error(f"❌  - [{context}] 验证交互失败: {e}")
