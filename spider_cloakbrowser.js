@@ -125,6 +125,96 @@ async function sendTelegram(message, screenshotPath) {
     }
 }
 
+
+
+
+// --- INJECTED_SCRIPT ---
+const INJECTED_SCRIPT = `
+(function() {
+    if (window.self === window.top) return;
+
+    // 1. 模拟鼠标屏幕坐标
+    try {
+        function getRandomInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+        let screenX = getRandomInt(800, 1200);
+        let screenY = getRandomInt(400, 600);
+        
+        Object.defineProperty(MouseEvent.prototype, 'screenX', { value: screenX });
+        Object.defineProperty(MouseEvent.prototype, 'screenY', { value: screenY });
+    } catch (e) { }
+
+    // 2. 简单的 attachShadow Hook
+    try {
+        const originalAttachShadow = Element.prototype.attachShadow;
+        
+        Element.prototype.attachShadow = function(init) {
+            const shadowRoot = originalAttachShadow.call(this, init);
+            
+            if (shadowRoot) {
+                const checkAndReport = () => {
+                    const checkbox = shadowRoot.querySelector('input[type="checkbox"]');
+                    if (checkbox) {
+                        const rect = checkbox.getBoundingClientRect();
+                        if (rect.width > 0 && rect.height > 0 && window.innerWidth > 0 && window.innerHeight > 0) {
+                            const xRatio = (rect.left + rect.width / 2) / window.innerWidth;
+                            const yRatio = (rect.top + rect.height / 2) / window.innerHeight;
+                            window.__turnstile_data = { xRatio, yRatio };
+                            return true;
+                        }
+                    }
+                    return false;
+                };
+
+                if (!checkAndReport()) {
+                    const observer = new MutationObserver(() => {
+                        if (checkAndReport()) observer.disconnect();
+                    });
+                    observer.observe(shadowRoot, { childList: true, subtree: true });
+                }
+            }
+            return shadowRoot;
+        };
+    } catch (e) {
+        console.error('[注入] Hook attachShadow 失败:', e);
+    }
+})();
+`;
+
+
+async function attemptTurnstileCdp(page) {
+    const frames = page.frames();
+    for (const frame of frames) {
+        try {
+            const data = await frame.evaluate(() => window.__turnstile_data).catch(() => null);
+
+            if (data) {
+                console.log('>> 在 frame 中发现 Turnstile。比例:', data);
+
+                const iframeElement = await frame.frameElement();
+                if (!iframeElement) continue;
+
+                const box = await iframeElement.boundingBox();
+                if (!box) continue;
+
+                const clickX = box.x + (box.width * data.xRatio);
+                const clickY = box.y + (box.height * data.yRatio);
+
+                console.log(`>> 计算点击坐标: (${clickX.toFixed(2)}, ${clickY.toFixed(2)})`);
+
+                await page.mouse.click(clickX,clickY);
+
+                console.log('>> CDP 点击已发送。');
+                
+                return true;
+            }
+        } catch (e) { }
+    }
+    return false;
+}
+
+
 // 辅助函数：检测代理是否可用
 async function checkProxy() {
     if (!PROXY_CONFIG) return true;
@@ -217,9 +307,9 @@ class JisuSpider {
     }
 
     async setupDriver() {
-        console.log('🛠️  - 驱动初始化 (cloakbrowser/puppeteer)');
+        console.log('🛠️  - 驱动初始化 (cloakbrowser)');
         try {
-            const { launch } = await import('cloakbrowser/puppeteer');
+            const { launch } = await import('cloakbrowser');
 
             const launchArgs = [];
 
@@ -252,9 +342,9 @@ class JisuSpider {
                 args: launchArgs
             };
 
-            if (HTTP_PROXY&&is_proxy_enable) {
+            if (HTTP_PROXY && is_proxy_enable) {
                 launchOptions.proxy = HTTP_PROXY;
-                launchOptions.geoip = true;
+                launchOptions.geoip = false;
             }
 
             this.browser = await launch(launchOptions);
@@ -276,10 +366,14 @@ class JisuSpider {
             console.warn(`⚠️ 获取出站 IP 出错: ${e.message}`);
         }
 
-        const pages = await this.browser.pages();
-        this.page = pages.length > 0 ? pages[0] : await this.browser.newPage();
-        await this.page.setViewport({ width: 1280, height: 720 });
-        //await this.page.evaluateOnNewDocument(INJECT_SCRIPT);
+        this.page = await this.browser.newPage();
+        await this.page.setViewportSize({ width: 1280, height: 720 });
+        await this.page.addInitScript(INJECTED_SCRIPT);
+
+        try {
+            const context = this.page.context();
+            await context.clearCookies();
+        } catch { }
     }
 
     async buildSession() {
@@ -320,102 +414,48 @@ class JisuSpider {
             if (content.includes("challenge-platform") === true){
                 console.log('检测到码');
                 try {
-                    await checkTurnstile({ page: this.page });
+                   cdpClickResult=await attemptTurnstileCdp(this.page)
                 } catch (err) { }
-                cdpClickResult=true
+                
             }
 
-            
-
-            if (cdpClickResult) {
-                console.log('   >> 登录 CDP 点击生效。正在等待最多 10秒 Cloudflare 成功标志...');
-                for (let waitSec = 0; waitSec < 20; waitSec++) {
-                    const frames = this.page.frames();
-
-                    for (const f of frames) {
-                        if (f.url().includes('cloudflare')) {
-                            try {
-                                const visible = await f.evaluate(() => {
-                                    const el = document.querySelector('.mark-success, [aria-label="Success"]');
-                                    return el ? el.offsetParent !== null : false;
-                                }).catch(() => false);
-                                if (visible) {
-                                    isSuccess = true;
-                                    break;
-                                }
-                            } catch (e) { }
-                        }
-                    }
-
-                    try {
-                        const token = await this.page.evaluate(() => {
-                            const els = document.querySelectorAll(
-                                'input[name="cf-turnstile-response"]'
-                            );
-                            for (const el of els) {
-                                if (el.value && el.value.length > 2) return el.value;
-                            }
-                            return '';
-                        });
-                        if (token) {
-                            isSuccess = true;
-                            console.log('   >> token Turnstile 验证成功。');
-                        }
-                    } catch { }
-
-            
-                    const frames2 = this.page.frames();
-                    for (const f of frames2) {
-                        if (f.url().includes('cloudflare')) {
-                            try {
-                                if (await f.getByText('Success!', { exact: false }).isVisible({ timeout: 500 })) {
-                                    isSuccess = true;
-                                    console.log('   >> frames2 Turnstile 验证成功。');
-                                    break;
-                                }
-                            } catch (e) { }
-                        }
-                    }
-                    
-
-
-
-                    const finalContent = await this.page.content();
-                    if (finalContent.includes("challenge-platform") === false) {
-                        isSuccess = true;
-                        console.log('   >> finalContent Turnstile 验证成功。');
-                    }
-                    
-
-                    const cookies = await this.page.cookies();
-                    if (cookies.some(c => c.name === 'cf_clearance')) {
-                        isSuccess = true;
-                        console.log('   >> cf_clearance Turnstile 验证成功。');
-                        break;
-                    }
-                    
-
-                    if (!isSuccess) {
-                        try {
-                            isSuccess = await this.page.evaluate(() => !!document.querySelector('.card-content-h1'));
-                        } catch (e) { }
-                    }
-                    if (isSuccess) {
-                        console.log('   >> 登录前 Turnstile 验证成功。');
-                        break;
-                    }
-                    await sleep(1000);
-                }
-            } else {
+            console.log('   >> 登录 CDP 点击生效。正在等待最多 20秒 Cloudflare 成功标志...');
+            for (let waitSec = 0; waitSec < 20; waitSec++) {
                 try {
-                    isSuccess = await this.page.evaluate(() => !!document.querySelector('.card-content-h1'));
-                    if (isSuccess) {
-                        console.log('   >> 登录前 Turnstile 验证成功。');
+                    const token = await page.evaluate(() => {
+                        function queryDeep(selector, root = document) {
+                            const result = [];
+                            const search = (node) => {
+                                for (const el of node.querySelectorAll(selector)) result.push(el);
+                                for (const el of node.querySelectorAll('*')) {
+                                    if (el.shadowRoot) search(el.shadowRoot);
+                                }
+                            };
+                            search(root);
+                            return result;
+                        }
+                        const els = queryDeep('input[name="cf-turnstile-response"]');
+                        for (const el of els) {
+                            if (el.value && el.value.length > 0) return el.value;
+                        }
+                        return '';
+                    });
+                    if (token) {
+                        console.log('   >> token Turnstile 验证成功。');
+                        isSuccess = true;
                         break;
                     }
                 } catch (e) { }
-                console.log('   >> 登录前未检测到或未点击 Turnstile，继续操作...');
+
+                if (isSuccess) {
+                    break;
+                }
+                await sleep(1000);
             }
+            if (isSuccess) {
+                console.log('   >> 登录前 Turnstile 验证成功。');
+            }
+
 
             if (isSuccess) {
                 break;
