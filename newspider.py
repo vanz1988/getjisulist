@@ -255,8 +255,8 @@ class JisuSpider:
     def _handle_turnstile_via_opshadow(self, context=""):
         try:
             container = WebDriverWait(self.driver, 15).until(
-                EC.presence_of_element_located(
-                    (By.XPATH, "//div[.//input[@name='cf-turnstile-response']]")
+                EC.visibility_of_element_located(
+                    (By.XPATH, "//div[contains(@style, 'display: grid') and .//input[@name='cf-turnstile-response']]")
                 )
             )
 
