@@ -382,7 +382,7 @@ class JisuSpider:
         if self.driver:
             self.driver.quit()
             self.driver = None
-            return True, "❌ Cloudflare 打码成功"
+            return False, "打码失败"
 
         all_dramas = []
         for page_url in self.page_urls:
