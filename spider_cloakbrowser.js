@@ -377,22 +377,6 @@ class JisuSpider {
                         }
                     }
                     
-
-
-
-                    const finalContent = await this.page.content();
-                    if (finalContent.includes("challenge-platform") === false) {
-                        isSuccess = true;
-                        console.log('   >> finalContent Turnstile 验证成功。');
-                    }
-                    
-
-                    const cookies = await this.page.cookies();
-                    if (cookies.some(c => c.name === 'cf_clearance')) {
-                        isSuccess = true;
-                        console.log('   >> cf_clearance Turnstile 验证成功。');
-                        break;
-                    }
                     
 
                     if (!isSuccess) {
