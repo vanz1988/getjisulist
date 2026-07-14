@@ -226,9 +226,10 @@ class JisuSpider:
             # 轮询检查 Token
             validated = False
             for _ in range(25):
-                token = self.driver.execute_script(
-                    """const els = document.querySelector("input[name=\'cf-turnstile-response\']");
-                    for (const e of els) { if (e.value && e.value.length > 20) return e.value; } return '';"""
+                token = self.driver.execute_script("""
+                    const els = document.querySelectorAll("input[name=\'cf-turnstile-response\']");
+                    for (const e of els) { if (e.value && e.value.length > 20) return e.value; } return '';
+                    """
                 )
                 if token and len(token) > 10:
                     logger.info(f"✅ {self.masked_user} - [{context}] 验证已通过 (Token Ready)")
