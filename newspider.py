@@ -279,7 +279,7 @@ class JisuSpider:
         #        self._build_session()
         #        return True
 
-         sleep(33000 + random.random() * 1000)
+        sleep(33000 + random.random() * 1000)
 
         logger.warning(f"所有打码方式失败，已尝试 {max_attempts * 2} 次")
         return False
