@@ -19,6 +19,8 @@ jobs:
       PAGE_URLS: ${{ secrets.PAGE_URLS }}
       TURNSTILE_URL: ${{ secrets.TURNSTILE_URL }}
       HOST_URL: ${{ secrets.HOST_URL }}
+      CHROMEDRIVER_PATH: ${{ secrets.CHROMEDRIVER_PATH }}
+      CHROME_BINARY: ${{ secrets.CHROME_BINARY }}
 
     steps:
       - name: Checkout repository
