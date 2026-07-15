@@ -143,68 +143,51 @@ class JisuSpider:
 
         self.page.set.window.size(1280, 720)
 
-    def _handle_turnstile(self, context=""):
+    def _check_turnstile_status(self, , max_attempts=5):
         try:
-            container = self.page.ele(
-                'xpath://div[contains(@style, "display: grid") and .//input[@name="cf-turnstile-response"]]',
-                timeout=15
-            )
-            if not container:
-                logger.warning(f"🖱️ - [{context}] 未找到 Turnstile 容器")
+            cf_iframe = self.page.run_js("""
+                var allEls = document.querySelectorAll('*');
+                for (var i = 0; i < allEls.length; i++) {
+                    var sr = allEls[i].opshadowRoot;
+                    if (sr) {
+                        var iframe = sr.querySelector('iframe[src*="challenges.cloudflare.com"]');
+                        if (iframe) return iframe;
+                    }
+                }
+                return null;
+            """)
+
+            if not cf_iframe:
+                logger.warning(f"验证可能跳过了")
                 return False
 
-            logger.info("✅  - 找到元素了")
+            src = cf_iframe.attr('src') or ''
+            logger.info(f"🖱️ - [{context}] 从 opshadowRoot 拿到 CF iframe: {src[:80]}")
 
-            size = container.rect.size
-            base_offset_x = -(size[0] / 2) + (size[0] * 0.044)
-            rand_x = base_offset_x + random.uniform(-5, 5)
-            rand_y = random.uniform(-5, 5)
-
-            logger.info(f"🖱️ - [{context}] 找到窗口")
-
-            rect = container.rect
-            center_x = rect.location[0] + rect.size[0] / 2
-            center_y = rect.location[1] + rect.size[1] / 2
-            click_x = center_x + rand_x
-            click_y = center_y + rand_y
-
-            click_x = round(click_x)
-            click_y = round(click_y)
-
-            logger.info(f"🖱️ - [{context}] 焦点马上点击")
-
-            container.click(offset_x=rand_x, offset_y=rand_y)
-
-            logger.info(f"🖱️ - [{context}] 执行偏移点击...{click_x},{click_y}")
-
-            validated = False
-            sleep(8000)
-            for _ in range(10):
-                token = self.page.run_js("""
-                    function queryDeep(selector, root = document) {
-                        const result = [];
-                        const search = (node) => {
-                            for (const el of node.querySelectorAll(selector)) result.push(el);
-                            for (const el of node.querySelectorAll('*')) {
-                                if (el.shadowRoot) search(el.shadowRoot);
-                            }
-                        };
-                        search(root);
-                        return result;
+            cf_page = self.page.get_frame(cf_iframe)
+            
+            # 在 JS 里找 cf-turnstile-response
+            token = cf_page.run_js("""
+                // 1. opshadowRoot 内找 cf-turnstile-response（YSbrowser 定制功能）
+                var allEls = document.querySelectorAll('*');
+                for (var i = 0; i < allEls.length; i++) {
+                    var sr = allEls[i].opshadowRoot;
+                    if (sr) {
+                        var cb = sr.querySelector('input[name="cf-turnstile-response"]');
+                        if (cb) {
+                            if (el.value && el.value.length > 20) return el.value;
+                        }
                     }
-                    const els = queryDeep('input[name="cf-turnstile-response"]');
-                    for (const el of els) {
-                        if (el.value && el.value.length > 0) return el.value;
-                    }
-                    return '';
-                """)
+                }
+                return null;
+            """)
 
-                if token:
-                    logger.info("token 成功验证")
-                    return True
-                sleep(500)
+            if token:
+                logger.info("token 成功验证")
+                return True
 
-            return validated
+
+            return False
         except Exception as e:
             logger.error(f"❌  - [{context}] 验证交互失败: {e}")
             return False
