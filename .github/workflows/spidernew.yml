@@ -37,7 +37,7 @@ jobs:
       - name: Download YSBrowser from my backup
         run: |
           mkdir -p /home/runner/.ysbrowser/chromium-140.0.7339.133
-          wget https://github.com/vanz1988/getjisulist/releases/download/v140.0.7339.133/ysbrowser-bundle.tar.gz
+          wget https://github.com/vanz1988/getjisulist/releases/download/v140.0.7339.133-2/ysbrowser-bundle.tar.gz
           tar -xzf ysbrowser-bundle.tar.gz -C /home/runner/.ysbrowser/chromium-140.0.7339.133/
           chmod +x /home/runner/.ysbrowser/chromium-140.0.7339.133/opt/chromium.org/chromium-unstable/chromium-browser-unstable
           chmod +x /home/runner/.ysbrowser/chromium-140.0.7339.133/opt/chromium.org/chromium-unstable/chromedriver
