@@ -143,48 +143,51 @@ class JisuSpider:
 
         self.page.set.window.size(1280, 720)
 
-    def _check_turnstile_status(self, , max_attempts=5):
+    def _check_turnstile_status(self, , max_attempts=8):
         try:
-            cf_iframe = self.page.run_js("""
-                var allEls = document.querySelectorAll('*');
-                for (var i = 0; i < allEls.length; i++) {
-                    var sr = allEls[i].opshadowRoot;
-                    if (sr) {
-                        var iframe = sr.querySelector('iframe[src*="challenges.cloudflare.com"]');
-                        if (iframe) return iframe;
-                    }
-                }
-                return null;
-            """)
-
-            if not cf_iframe:
-                logger.warning(f"验证可能跳过了")
-                return False
-
-            src = cf_iframe.attr('src') or ''
-            logger.info(f"🖱️ - [{context}] 从 opshadowRoot 拿到 CF iframe: {src[:80]}")
-
-            cf_page = self.page.get_frame(cf_iframe)
-            
-            # 在 JS 里找 cf-turnstile-response
-            token = cf_page.run_js("""
-                // 1. opshadowRoot 内找 cf-turnstile-response（YSbrowser 定制功能）
-                var allEls = document.querySelectorAll('*');
-                for (var i = 0; i < allEls.length; i++) {
-                    var sr = allEls[i].opshadowRoot;
-                    if (sr) {
-                        var cb = sr.querySelector('input[name="cf-turnstile-response"]');
-                        if (cb) {
-                            if (el.value && el.value.length > 20) return el.value;
+            for i in range(max_attempts):
+                cf_iframe = self.page.run_js("""
+                    var allEls = document.querySelectorAll('*');
+                    for (var i = 0; i < allEls.length; i++) {
+                        var sr = allEls[i].opshadowRoot;
+                        if (sr) {
+                            var iframe = sr.querySelector('iframe[src*="challenges.cloudflare.com"]');
+                            if (iframe) return iframe;
                         }
                     }
-                }
-                return null;
-            """)
+                    return null;
+                """)
+    
+                if not cf_iframe:
+                    logger.warning(f"验证可能跳过了")
+                    return True
+    
+                src = cf_iframe.attr('src') or ''
+                logger.info(f"🖱️ - [{context}] 从 opshadowRoot 拿到 CF iframe: {src[:80]}")
+    
+                cf_page = self.page.get_frame(cf_iframe)
+                
+                # 在 JS 里找 cf-turnstile-response
+                token = cf_page.run_js("""
+                    // 1. opshadowRoot 内找 cf-turnstile-response（YSbrowser 定制功能）
+                    var allEls = document.querySelectorAll('*');
+                    for (var i = 0; i < allEls.length; i++) {
+                        var sr = allEls[i].opshadowRoot;
+                        if (sr) {
+                            var cb = sr.querySelector('input[name="cf-turnstile-response"]');
+                            if (cb) {
+                                if (el.value && el.value.length > 20) return el.value;
+                            }
+                        }
+                    }
+                    return null;
+                """)
+    
+                if token:
+                    logger.info("token 成功验证")
+                    return True
 
-            if token:
-                logger.info("token 成功验证")
-                return True
+                sleep(1000)
 
 
             return False
