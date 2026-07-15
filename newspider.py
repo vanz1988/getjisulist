@@ -91,8 +91,7 @@ class JisuSpider:
         co.set_local_port(rand_int(9222, 9322))
         co.auto_port()
 
-        if HEADLESS:
-            co.headless()
+
 
         co.set_argument('--no-sandbox')
         co.set_argument('--disable-dev-shm-usage')
@@ -259,8 +258,38 @@ class JisuSpider:
                             var r = cb.getBoundingClientRect();
                             return {type: 'checkbox_in_shadow', rect: {x: r.left, y: r.top, w: r.width, h: r.height}};
                         }
+                        var lbl = sr.querySelector('label');
+                        if (lbl) {
+                            var r = lbl.getBoundingClientRect();
+                            return {type: 'label_in_shadow', rect: {x: r.left, y: r.top, w: r.width, h: r.height}};
+                        }
                     }
                 }
+
+                // 2. 渲染为 checkbox 的 div（#KSUV2, #qkbk6 等）
+                var checkboxDivs = [
+                    document.getElementById('KSUV2'),
+                    document.getElementById('qkbk6'),
+                    document.querySelector('.NeJGf6'),
+                    document.getElementById('CVHe3'),
+                    document.querySelector('.BmNg2'),
+                    document.querySelector('.MGZG4')
+                ];
+                for (var j = 0; j < checkboxDivs.length; j++) {
+                    var div = checkboxDivs[j];
+                    if (div) {
+                        var r = div.getBoundingClientRect();
+                        return {type: 'div_' + (div.id || div.className || 'unknown') + '_idx' + j, rect: {x: r.left, y: r.top, w: r.width, h: r.height}};
+                    }
+                }
+
+                // 3. 普通 DOM checkbox
+                var cb = document.querySelector('input[type="checkbox"]');
+                if (cb) { var r = cb.getBoundingClientRect(); return {type: 'checkbox_direct', rect: {x: r.left, y: r.top, w: r.width, h: r.height}}; }
+
+                // 4. body
+                var body = document.querySelector('body');
+                if (body) { var r = body.getBoundingClientRect(); return {type: 'body', rect: {x: r.left, y: r.top, w: r.width, h: r.height}}; }
 
                 return null;
             """)
@@ -321,6 +350,22 @@ class JisuSpider:
         for i in range(max_attempts):
             logger.info(f"手动打码第 {i+1} 次尝试...")
             self._handle_turnstile_via_opshadow(f"ManualPass-{i+1}")
+
+            cf_iframe = self.page.run_js("""
+                var allEls = document.querySelectorAll('*');
+                for (var i = 0; i < allEls.length; i++) {
+                    var sr = allEls[i].opshadowRoot;
+                    if (sr) {
+                        var iframe = sr.querySelector('iframe[src*="challenges.cloudflare.com"]');
+                        if (iframe) return iframe;
+                    }
+                }
+                return null;
+            """)
+
+            if not cf_iframe:
+                logger.warning(f"未找到CF框，跳转了")
+                return True
 
             if self.page.ele('.card-content-h1', timeout=8):
                 logger.info("手动打码成功！")
