@@ -91,7 +91,8 @@ class JisuSpider:
         co.set_local_port(rand_int(9222, 9322))
         co.auto_port()
 
-
+        if HEADLESS:
+            co.headless()
 
         co.set_argument('--no-sandbox')
         co.set_argument('--disable-dev-shm-usage')
