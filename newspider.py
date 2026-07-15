@@ -298,35 +298,23 @@ class JisuSpider:
         self.page.get(url)
         sleep(3000 + random.random() * 1000)
 
-        if self.page.ele('.card-content-h1', timeout=5):
+        #if self.page.ele('.card-content-h1', timeout=5):
+        #    logger.info("页面已加载，无需打码")
+        #    self._build_session()
+        #    return True
+
+        if _check_turnstile_status(1):
             logger.info("页面已加载，无需打码")
-            self._build_session()
             return True
 
         for i in range(max_attempts):
             logger.info(f"手动打码第 {i+1} 次尝试...")
             self._handle_turnstile_via_opshadow(f"ManualPass-{i+1}")
 
-            cf_iframe = self.page.run_js("""
-                var allEls = document.querySelectorAll('*');
-                for (var i = 0; i < allEls.length; i++) {
-                    var sr = allEls[i].opshadowRoot;
-                    if (sr) {
-                        var iframe = sr.querySelector('iframe[src*="challenges.cloudflare.com"]');
-                        if (iframe) return iframe;
-                    }
-                }
-                return null;
-            """)
-
-            if not cf_iframe:
-                logger.warning(f"未找到CF框，跳转了")
+            if _check_turnstile_status():
+                logger.info("打码成功！")
                 return True
-
-            if self.page.ele('.card-content-h1', timeout=8):
-                logger.info("手动打码成功！")
-                self._build_session()
-                return True
+            sleep(5000)
 
         logger.warning(f"所有打码方式失败，已尝试 {max_attempts} 次")
         return False
