@@ -165,22 +165,23 @@ class JisuSpider:
                 src = cf_iframe.attr('src') or ''
                 logger.info(f"从 opshadowRoot 拿到 CF iframe: {src[:80]}")
     
-                cf_page = self.page.get_frame(cf_iframe)
-                
-                # 在 JS 里找 cf-turnstile-response
-                token = cf_page.run_js("""
-                    // 1. opshadowRoot 内找 cf-turnstile-response（YSbrowser 定制功能）
-                    var allEls = document.querySelectorAll('*');
-                    for (var i = 0; i < allEls.length; i++) {
-                        var sr = allEls[i].opshadowRoot;
-                        if (sr) {
-                            var cb = sr.querySelector('input[name="cf-turnstile-response"]');
-                            if (cb) {
-                                if (el.value && el.value.length > 20) return el.value;
+                token = self.page.run_js("""
+                    function queryDeep(selector, root = document) {
+                        const result = [];
+                        const search = (node) => {
+                            for (const el of node.querySelectorAll(selector)) result.push(el);
+                            for (const el of node.querySelectorAll('*')) {
+                                if (el.shadowRoot) search(el.shadowRoot);
                             }
-                        }
+                        };
+                        search(root);
+                        return result;
                     }
-                    return null;
+                    const els = queryDeep('input[name="cf-turnstile-response"]');
+                    for (const el of els) {
+                        if (el.value && el.value.length > 20) return el.value;
+                    }
+                    return '';
                 """)
     
                 if token:
