@@ -299,22 +299,22 @@ class JisuSpider:
         self.page.get(url)
         sleep(4000 + random.random() * 1000)
 
-        #if self.page.ele('.card-content-h1', timeout=5):
-        #    logger.info("页面已加载，无需打码")
-        #    self._build_session()
-        #    return True
-
-        if self._check_turnstile_status(1):
+        if self.page.ele('.card-content-h1', timeout=5):
             logger.info("页面已加载，无需打码")
             self._build_session()
             return True
+
+        #if self._check_turnstile_status(1):
+        #    logger.info("页面已加载，无需打码")
+        #    self._build_session()
+        #    return True
 
         for i in range(max_attempts):
             logger.info(f"手动打码第 {i+1} 次尝试...")
             self._handle_turnstile_via_opshadow(f"ManualPass-{i+1}")
 
-            if self._check_turnstile_status():
-                logger.info("打码成功！")
+            if self.page.ele('.card-content-h1', timeout=5):
+                logger.info("页面已加载，打码成功")
                 self._build_session()
                 return True
             sleep(5000)
