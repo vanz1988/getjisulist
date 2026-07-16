@@ -296,7 +296,7 @@ class JisuSpider:
 
     def _pass_turnstile(self, url, max_attempts=5):
         self.page.get(url)
-        sleep(13000 + random.random() * 1000)
+        sleep(4000 + random.random() * 1000)
 
         #if self.page.ele('.card-content-h1', timeout=5):
         #    logger.info("页面已加载，无需打码")
