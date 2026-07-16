@@ -143,7 +143,7 @@ class JisuSpider:
 
         self.page.set.window.size(1280, 720)
 
-    def _check_turnstile_status(self, , max_attempts=8):
+    def _check_turnstile_status(self,  max_attempts=8):
         try:
             for i in range(max_attempts):
                 cf_iframe = self.page.run_js("""
@@ -163,7 +163,7 @@ class JisuSpider:
                     return True
     
                 src = cf_iframe.attr('src') or ''
-                logger.info(f"🖱️ - [{context}] 从 opshadowRoot 拿到 CF iframe: {src[:80]}")
+                logger.info(f"从 opshadowRoot 拿到 CF iframe: {src[:80]}")
     
                 cf_page = self.page.get_frame(cf_iframe)
                 
@@ -192,7 +192,7 @@ class JisuSpider:
 
             return False
         except Exception as e:
-            logger.error(f"❌  - [{context}] 验证交互失败: {e}")
+            logger.error(f"❌  验证交互失败: {e}")
             return False
 
     def _handle_turnstile_via_opshadow(self, context=""):
@@ -296,26 +296,29 @@ class JisuSpider:
 
     def _pass_turnstile(self, url, max_attempts=5):
         self.page.get(url)
-        sleep(3000 + random.random() * 1000)
+        sleep(13000 + random.random() * 1000)
 
         #if self.page.ele('.card-content-h1', timeout=5):
         #    logger.info("页面已加载，无需打码")
         #    self._build_session()
         #    return True
 
-        if _check_turnstile_status(1):
+        if self._check_turnstile_status(1):
             logger.info("页面已加载，无需打码")
+            self._build_session()
             return True
 
         for i in range(max_attempts):
             logger.info(f"手动打码第 {i+1} 次尝试...")
             self._handle_turnstile_via_opshadow(f"ManualPass-{i+1}")
 
-            if _check_turnstile_status():
+            if self._check_turnstile_status():
                 logger.info("打码成功！")
+                self._build_session()
                 return True
             sleep(5000)
 
+        self._build_session()
         logger.warning(f"所有打码方式失败，已尝试 {max_attempts} 次")
         return False
 
