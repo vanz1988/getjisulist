@@ -301,6 +301,7 @@ class JisuSpider:
 
         if self.page.ele('.card-content-h1', timeout=5):
             logger.info("页面已加载，无需打码")
+            sleep(3000)
             self._build_session()
             return True
 
@@ -315,10 +316,12 @@ class JisuSpider:
 
             if self.page.ele('.card-content-h1', timeout=5):
                 logger.info("页面已加载，打码成功")
+                sleep(3000)
                 self._build_session()
                 return True
             sleep(5000)
 
+        sleep(3000)
         self._build_session()
         logger.warning(f"所有打码方式失败，已尝试 {max_attempts} 次")
         return False
