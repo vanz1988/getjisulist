@@ -142,9 +142,12 @@ class JisuSpider:
             raise
 
         self.page.set.window.size(1280, 720)
-        self.page.get('https://api.ip.sb/ip')
-        ip = self.page.text.strip()
-        logger.info(f"📍 当前出口IP: {ip[:60]}")
+        try:
+            self.page.get('https://api.ip.sb/ip')
+            ip = self.page('tag:body').text.strip()
+            logger.info(f"📍 当前出口IP: {ip[:60]}")
+        except Exception as e:
+            logger.error(f"❌  获取当前出口IP失败: {e}")
 
     def _check_turnstile_status(self,  max_attempts=8):
         try:
