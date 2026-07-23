@@ -142,6 +142,9 @@ class JisuSpider:
             raise
 
         self.page.set.window.size(1280, 720)
+        self.page.get('https://api.ip.sb/ip')
+        ip = self.page.text.strip()
+        logger.info(f"📍 当前出口IP: {ip[:60]}")
 
     def _check_turnstile_status(self,  max_attempts=8):
         try:
