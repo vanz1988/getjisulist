@@ -2,7 +2,7 @@ name: new spider
 on:
   workflow_dispatch:
   schedule:
-    - cron: '11 2 */1 * *'   
+    - cron: '7 2 */1 * *'   
 
 permissions:
   actions: write
