@@ -266,7 +266,7 @@ class JisuSpider:
                 oy = max(0, min(h, oy))
                 cx = rect['x'] + ox
                 cy = rect['y'] + oy
-
+                logger.info(f"🖱️ - [{context}] 坐标({rect['x']:.0f}, {rect['y']:.0f}, {rect['w']:.0f}, {rect['h']:.0f})")
                 logger.info(f"🖱️ - [{context}] 找到可点击元素: {click_target['type']}，点击坐标({cx:.0f}, {cy:.0f})")
 
                 # 模拟真实鼠标：用 cf_page.actions 在 iframe 上下文里点
