@@ -260,8 +260,10 @@ class JisuSpider:
             if click_target:
                 rect = click_target['rect']
                 w, h = rect['w'], rect['h']
-                ox = random.uniform(-3, 3) + (w - 3) * random.random()
-                oy = random.uniform(-3, 3) + (h - 3) * random.random()
+                ox = random.gauss(w/2, w/6)   # 可调整标准差
+                oy = random.gauss(h/2, h/6)
+                ox = max(0, min(w, ox))       # 截断到 [0, w]
+                oy = max(0, min(h, oy))
                 cx = rect['x'] + ox
                 cy = rect['y'] + oy
 
