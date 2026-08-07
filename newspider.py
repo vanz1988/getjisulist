@@ -286,6 +286,7 @@ class JisuSpider:
                 except Exception as e:
                     logger.error(f"🖱️ - [{context}] 鼠标点击失败: {e}")
                     return False
+            return True
         except Exception as e:
             logger.error(f"❌ - [{context}] opshadowRoot 访问失败: {e}")
             return False
