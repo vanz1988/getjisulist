@@ -267,13 +267,14 @@ class JisuSpider:
                 cx = rect['x'] + ox
                 cy = rect['y'] + oy
                 logger.info(f"🖱️ - [{context}] 坐标({rect['x']:.0f}, {rect['y']:.0f}, {rect['w']:.0f}, {rect['h']:.0f})")
-                logger.info(f"🖱️ - [{context}] 找到可点击元素: {click_target['type']}，点击坐标({cx:.0f}, {cy:.0f})")
+                #logger.info(f"🖱️ - [{context}] 找到可点击元素: {click_target['type']}，点击坐标({cx:.0f}, {cy:.0f})")
 
                 # 模拟真实鼠标：用 cf_page.actions 在 iframe 上下文里点
                 try:
                     actions = cf_page.actions
                     start_x = rect['x'] + w * random.uniform(0.2, 0.8)
                     start_y = rect['y'] + h * random.uniform(0.2, 0.8)
+                    logger.info(f"🖱️ - [{context}] 找到可点击元素: {click_target['type']}，起点坐标({start_x:.0f}, {start_y:.0f}),点击坐标({cx:.0f}, {cy:.0f})")
                     actions.move_to((start_x, start_y))
                     time.sleep(random.uniform(0.2, 0.5))
                     actions.move(cx - start_x, cy - start_y)
