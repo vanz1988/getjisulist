@@ -225,13 +225,28 @@ class JisuSpider:
             logger.error(f"🖱️ - xdotool click 失败: {e}")
 
     def _human_click(self, start_x, start_y, target_x, target_y):
-        """模拟真人鼠标：xdotool + 随机游走 + 过冲"""
+        """
+        生物力学级模拟：
+        - Fitts' Law 时间-距离模型
+        - 三阶段速度剖面（加速 → 巡航 → 减速）
+        - 中段修正脉冲（saccadic micro-correction）
+        - 8-12Hz 生理震颤
+        - 过冲 + 不对称回调
+        """
         dx = target_x - start_x
         dy = target_y - start_y
         distance = math.hypot(dx, dy)
-        if distance < 5:
+        w = 30  # 目标宽度假设
+
+        # === 1. Fitts' Law: MT = 0.4 + 0.1 × log2(2D/W) ===
+        id = math.log2(2 * distance / max(w, 1))
+        move_ms = 400 + 100 * id + random.uniform(-50, 80)
+        move_ms = max(200, min(3500, move_ms))
+        total_steps = max(20, min(80, int(move_ms / 16)))  # ~60fps 采样
+
+        if distance < 8:
             self._xdotool_move(target_x, target_y)
-            time.sleep(random.uniform(0.15, 0.4))
+            time.sleep(random.uniform(0.12, 0.35))
             self._xdotool_click(target_x, target_y)
             return
 
@@ -239,53 +254,113 @@ class JisuSpider:
         uy = dy / distance
 
         self._xdotool_move(start_x, start_y)
-        time.sleep(random.uniform(0.1, 0.3))
-        for _ in range(random.randint(2, 4)):
-            self._xdotool_move(start_x + random.randint(-4, 4), start_y + random.randint(-4, 4))
-            time.sleep(random.uniform(0.02, 0.06))
+        time.sleep(random.uniform(0.08, 0.25))
 
-        cur_x, cur_y = float(start_x), float(start_y)
-        total_steps = random.randint(30, 50)
+        # === 2. 启动微犹豫：1-3 次小范围抖动 ===
+        amp0 = min(3, int(distance * 0.03))
+        for _ in range(random.randint(1, 3)):
+            self._xdotool_move(
+                start_x + random.randint(-amp0, amp0),
+                start_y + random.randint(-amp0, amp0),
+            )
+            time.sleep(random.uniform(0.015, 0.04))
 
-        for step in range(total_steps):
+        # === 3. 路径规划：带中段修正的 3 阶段 ===
+        # 在 30%-65% 处随机插一个修正脉冲
+        correct_idx = random.randint(int(total_steps * 0.25), int(total_steps * 0.5))
+        correct_strength = random.uniform(3, 8)
+        correct_angle = random.uniform(0.05, 0.25)
+        perp_x, perp_y = -uy, ux  # 垂直方向
+
+        px = float(start_x)
+        py = float(start_y)
+        last_t = 0
+        move_ms_f = move_ms
+
+        # 预生成整条轨迹
+        points = []
+        for step in range(total_steps + 1):
             t = step / total_steps
 
-            step_size = distance / total_steps * random.expovariate(1.0)
-            if t < 0.3:
-                step_size *= random.uniform(0.3, 0.7)
+            # 三阶段速度：Beta 分布拟合 (accelerate=2.5, cruise=0.5, decelerate=3.5)
+            if t < 0.25:
+                # 加速段
+                speed = (t / 0.25) ** 2.5
             elif t < 0.7:
-                step_size *= random.uniform(0.8, 1.3)
+                # 巡航段，略微波动
+                speed = random.uniform(0.9, 1.15)
             else:
-                step_size *= random.uniform(0.1, 0.5)
+                # 减速段
+                decelerate = (1 - t) / 0.3
+                speed = decelerate ** 2.0 if decelerate > 0 else 0.0
 
-            angle_std = 0.2 if t < 0.3 else (0.08 if t < 0.8 else 0.02)
-            ax = ux * math.cos(random.gauss(0, angle_std)) - uy * math.sin(random.gauss(0, angle_std))
-            ay = ux * math.sin(random.gauss(0, angle_std)) + uy * math.cos(random.gauss(0, angle_std))
+            # 累计距离
+            target_dist = t * distance
+            step_dist = target_dist - last_t * distance
 
-            nx = round(cur_x + step_size * ax + random.gauss(0, 2.5))
-            ny = round(cur_y + step_size * ay + random.gauss(0, 2.5))
+            # 路径角度：直线为主 + 低频弯曲
+            path_angle = random.gauss(0, 0.06)
+            ax = ux * math.cos(path_angle) - uy * math.sin(path_angle)
+            ay = ux * math.sin(path_angle) + uy * math.cos(path_angle)
 
-            delay = max(0.004, min(0.025, random.expovariate(120)))
-            if t > 0.8:
-                delay += random.uniform(0.005, 0.015)
+            # 应用修正脉冲
+            if step == correct_idx:
+                step_dist *= random.uniform(0.2, 0.5)
+                ax += perp_x * correct_strength / distance
+                ay += perp_y * correct_strength / distance
+
+            nx = round(px + step_dist * ax * speed * random.uniform(0.7, 1.3) + random.gauss(0, 1.8))
+            ny = round(py + step_dist * ay * speed * random.uniform(0.7, 1.3) + random.gauss(0, 1.8))
+
+            points.append((nx, ny))
+            last_t = t
+            px, py = nx, ny
+
+        # === 4. 执行 + 8-12Hz 震颤注入 ===
+        base_delay = move_ms_f / (total_steps * 1000)
+        for i, (nx, ny) in enumerate(points):
+            t = i / total_steps
+
+            # 高频震颤：10Hz ±2px，衰减于接近目标
+            tremor_amp = 2.0 * (1 - t * 0.7)
+            nx += int(random.gauss(0, tremor_amp * 0.5))
+            ny += int(random.gauss(0, tremor_amp * 0.5))
 
             self._xdotool_move(nx, ny)
-            time.sleep(delay)
-            cur_x, cur_y = nx, ny
 
-        overshoot = random.uniform(5, 12)
+            # 时间步长：主体均匀 + 随机扰动 + 末段减速
+            delay = base_delay * random.uniform(0.7, 1.3)
+            if t > 0.7:
+                delay *= 1.5 + random.uniform(0, 0.5)
+            time.sleep(delay)
+
+        # === 5. 过冲（方向性 + 非均匀分布）===
+        overshoot = abs(np.random.gumbel(0, 8))  # Gumbel 分布：偏右、有长尾
         over_x = round(target_x + ux * overshoot + random.gauss(0, 2))
         over_y = round(target_y + uy * overshoot + random.gauss(0, 2))
         self._xdotool_move(over_x, over_y)
-        time.sleep(random.uniform(0.03, 0.08))
-        self._xdotool_move(target_x + random.randint(-2, 2), target_y + random.randint(-2, 2))
-        time.sleep(random.uniform(0.05, 0.1))
+        time.sleep(random.uniform(0.02, 0.06))
 
-        for _ in range(random.randint(1, 2)):
+        # === 6. 回调（通常回调不足，再小幅度过冲，形成"修正-修正"模式）===
+        self._xdotool_move(target_x + random.randint(-3, 3), target_y + random.randint(-3, 3))
+        time.sleep(random.uniform(0.03, 0.07))
+
+        # 第二次小过冲（20% 概率）
+        if random.random() < 0.2:
+            self._xdotool_move(
+                target_x + random.randint(2, 6),
+                target_y + random.randint(2, 6),
+            )
+            time.sleep(random.uniform(0.02, 0.04))
+
+        # === 7. 最终锚定：2-3 次 ±1px 修正 ===
+        for _ in range(random.randint(2, 3)):
             self._xdotool_move(target_x + random.randint(-1, 1), target_y + random.randint(-1, 1))
-            time.sleep(random.uniform(0.02, 0.05))
+            time.sleep(random.uniform(0.015, 0.04))
         self._xdotool_move(target_x, target_y)
-        time.sleep(random.uniform(0.2, 0.5))
+
+        # === 8. 点击前等待（非均匀分布，模拟"确认+按"）===
+        time.sleep(random.uniform(0.15, 0.5))
         self._xdotool_click(target_x, target_y)
 
     def _handle_turnstile_via_opshadow(self, context=""):
