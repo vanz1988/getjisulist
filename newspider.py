@@ -202,6 +202,90 @@ class JisuSpider:
             logger.error(f"❌  验证交互失败: {e}")
             return False
 
+    def _xdotool_move(self, x, y):
+        """用 xdotool 移动鼠标"""
+        try:
+            subprocess.run(
+                ["xdotool", "mousemove", str(x), str(y)],
+                check=True, capture_output=True, timeout=2
+            )
+        except Exception:
+            pass
+
+    def _xdotool_click(self, x, y):
+        """用 xdotool 点击"""
+        try:
+            subprocess.run(
+                ["xdotool", "mousemove", str(x), str(y), "click", "1"],
+                check=True, capture_output=True, timeout=3
+            )
+        except Exception as e:
+            logger.error(f"🖱️ - xdotool click 失败: {e}")
+
+    def _human_click(self, start_x, start_y, target_x, target_y):
+        """模拟真人鼠标：xdotool + 随机游走 + 过冲"""
+        dx = target_x - start_x
+        dy = target_y - start_y
+        distance = math.hypot(dx, dy)
+        if distance < 5:
+            self._xdotool_move(target_x, target_y)
+            time.sleep(random.uniform(0.15, 0.4))
+            self._xdotool_click(target_x, target_y)
+            return
+
+        ux = dx / distance
+        uy = dy / distance
+
+        self._xdotool_move(start_x, start_y)
+        time.sleep(random.uniform(0.1, 0.3))
+        for _ in range(random.randint(2, 4)):
+            self._xdotool_move(start_x + random.randint(-4, 4), start_y + random.randint(-4, 4))
+            time.sleep(random.uniform(0.02, 0.06))
+
+        cur_x, cur_y = float(start_x), float(start_y)
+        total_steps = random.randint(30, 50)
+
+        for step in range(total_steps):
+            t = step / total_steps
+
+            step_size = distance / total_steps * random.expovariate(1.0)
+            if t < 0.3:
+                step_size *= random.uniform(0.3, 0.7)
+            elif t < 0.7:
+                step_size *= random.uniform(0.8, 1.3)
+            else:
+                step_size *= random.uniform(0.1, 0.5)
+
+            angle_std = 0.2 if t < 0.3 else (0.08 if t < 0.8 else 0.02)
+            ax = ux * math.cos(random.gauss(0, angle_std)) - uy * math.sin(random.gauss(0, angle_std))
+            ay = ux * math.sin(random.gauss(0, angle_std)) + uy * math.cos(random.gauss(0, angle_std))
+
+            nx = round(cur_x + step_size * ax + random.gauss(0, 2.5))
+            ny = round(cur_y + step_size * ay + random.gauss(0, 2.5))
+
+            delay = max(0.004, min(0.025, random.expovariate(120)))
+            if t > 0.8:
+                delay += random.uniform(0.005, 0.015)
+
+            self._xdotool_move(nx, ny)
+            time.sleep(delay)
+            cur_x, cur_y = nx, ny
+
+        overshoot = random.uniform(5, 12)
+        over_x = round(target_x + ux * overshoot + random.gauss(0, 2))
+        over_y = round(target_y + uy * overshoot + random.gauss(0, 2))
+        self._xdotool_move(over_x, over_y)
+        time.sleep(random.uniform(0.03, 0.08))
+        self._xdotool_move(target_x + random.randint(-2, 2), target_y + random.randint(-2, 2))
+        time.sleep(random.uniform(0.05, 0.1))
+
+        for _ in range(random.randint(1, 2)):
+            self._xdotool_move(target_x + random.randint(-1, 1), target_y + random.randint(-1, 1))
+            time.sleep(random.uniform(0.02, 0.05))
+        self._xdotool_move(target_x, target_y)
+        time.sleep(random.uniform(0.2, 0.5))
+        self._xdotool_click(target_x, target_y)
+
     def _handle_turnstile_via_opshadow(self, context=""):
         try:
             cf_iframe = self.page.run_js("""
@@ -248,8 +332,7 @@ class JisuSpider:
                     if (sr) {
                         var cb = sr.querySelector('input[type="checkbox"]');
                         if (cb) {
-                            var r = cb.getBoundingClientRect();
-                            return {type: 'checkbox_in_shadow', rect: {x: r.left, y: r.top, w: r.width, h: r.height}};
+                            return cb;
                         }
                     }
                 }
@@ -258,29 +341,49 @@ class JisuSpider:
             """)
 
             if click_target:
-                rect = click_target['rect']
-                w, h = rect['w'], rect['h']
-                ox = random.gauss(w/2, w/6)   # 可调整标准差
-                oy = random.gauss(h/2, h/6)
-                ox = max(0, min(w, ox))       # 截断到 [0, w]
-                oy = max(0, min(h, oy))
-                cx = rect['x'] + ox
-                cy = rect['y'] + oy
-                logger.info(f"🖱️ - [{context}] 坐标({rect['x']:.0f}, {rect['y']:.0f}, {rect['w']:.0f}, {rect['h']:.0f})")
-                #logger.info(f"🖱️ - [{context}] 找到可点击元素: {click_target['type']}，点击坐标({cx:.0f}, {cy:.0f})")
-
                 # 模拟真实鼠标：用 cf_page.actions 在 iframe 上下文里点
                 try:
-                    actions = cf_page.actions
-                    start_x = rect['x'] + w * random.uniform(0.2, 0.8)
-                    start_y = rect['y'] + h * random.uniform(0.2, 0.8)
-                    logger.info(f"🖱️ - [{context}] 找到可点击元素: {click_target['type']}，起点坐标({start_x:.0f}, {start_y:.0f}),点击坐标({cx:.0f}, {cy:.0f})")
-                    actions.move_to((start_x, start_y))
-                    time.sleep(random.uniform(0.2, 0.5))
-                    actions.move(cx - start_x, cy - start_y)
-                    time.sleep(random.uniform(0.1, 0.3))
-                    actions.click()
-                    logger.info(f"🖱️ - [{context}] 真实鼠标点击完成")
+
+
+                    # w, h = click_target.rect.size
+                    # screen_loc = click_target.rect.screen_location   # (sx, sy) 元素左上角
+                    # sx = int(screen_loc[0])
+                    # sy = int(screen_loc[1])
+
+                    # # 元素内随机偏移
+                    # ox = max(0, min(w, random.gauss(w/2, w/6)))
+                    # oy = max(0, min(h, random.gauss(h/2, h/6)))
+                    # cx = sx + int(ox)
+                    # cy = sy + int(oy)
+
+                    # # 起点：元素内另一个随机点
+                    # start_x = sx + int(w * random.uniform(0.2, 0.8))
+                    # start_y = sy + int(h * random.uniform(0.2, 0.8))
+
+                    # logger.info(f"🖱️ - [{context}] 屏幕坐标({sx},{sy},{w},{h}) → 点击({cx},{cy}), 起点({start_x},{start_y})")
+                    # self._human_click(start_x, start_y, cx, cy)
+
+
+                    w, h = click_target.rect.size
+                    screen_loc = click_target.rect.screen_location   # (sx, sy) 元素左上角
+                    sx = int(screen_loc[0])
+                    sy = int(screen_loc[1])
+
+                    cx = sx + w / 2
+                    cy = sy + h / 2
+                    rx = random.gauss(cx, w / 4)
+                    ry = random.gauss(cy, h / 4)
+                    click_x = int(max(sx, min(sx + w, rx)))
+                    click_y = int(max(sy, min(sy + h, ry)))
+                    logger.info(f"🖱️ - [{context}] input rect=({sx},{sy}) size=({w:.1f},{h:.1f}) 点击点=({click_x},{click_y})")
+
+                    # 从随机起点出发，走贝塞尔曲线模拟真人
+                    start_x = max(1, click_x + random.randint(-300, -100))
+                    start_y = max(1, click_y + random.randint(-200, -50))
+
+                    logger.info(f"🖱️ - [{context}] 屏幕坐标({sx},{sy},{w},{h}) → 点击({click_x},{click_y}), 起点({start_x},{start_y})")
+                    self._human_click(start_x, start_y, cx, cy)
+
                     sleep(3000 + random.randint(0, 2000))
                     return True
                 except Exception as e:
@@ -290,6 +393,98 @@ class JisuSpider:
         except Exception as e:
             logger.error(f"❌ - [{context}] opshadowRoot 访问失败: {e}")
             return False
+
+
+
+
+    # def _handle_turnstile_via_opshadow(self, context=""):
+    #     try:
+    #         cf_iframe = self.page.run_js("""
+    #             var allEls = document.querySelectorAll('*');
+    #             for (var i = 0; i < allEls.length; i++) {
+    #                 var sr = allEls[i].opshadowRoot;
+    #                 if (sr) {
+    #                     var iframe = sr.querySelector('iframe[src*="challenges.cloudflare.com"]');
+    #                     if (iframe) return iframe;
+    #                 }
+    #             }
+    #             return null;
+    #         """)
+
+    #         if not cf_iframe:
+    #             logger.warning(f"🖱️ - [{context}] opshadowRoot 内未找到 CF iframe")
+    #             return False
+
+    #         src = cf_iframe.attr('src') or ''
+    #         logger.info(f"🖱️ - [{context}] 从 opshadowRoot 拿到 CF iframe: {src[:80]}")
+
+    #         cf_page = self.page.get_frame(cf_iframe)
+
+    #         iframe_info = cf_page.run_js("""
+    #             var r = {total: document.querySelectorAll('*').length, tags: []};
+    #             var all = document.querySelectorAll('*');
+    #             for (var i = 0; i < all.length; i++) {
+    #                 r.tags.push(all[i].tagName + (all[i].id ? '#' + all[i].id : '') + (all[i].className ? '.' + all[i].className : ''));
+    #                 if (all[i].opshadowRoot) {
+    #                     var sr = all[i].opshadowRoot;
+    #                     r.tags.push('  [shadow] children=' + sr.children.length + ' inner=' + (sr.innerHTML||'').substring(0,150));
+    #                 }
+    #             }
+    #             return r;
+    #         """)
+    #         logger.info(f"🔍 CF iframe 内部: 元素数={iframe_info.get('total')}, 标签: {iframe_info.get('tags', [])[:30]}")
+
+    #         # 在 JS 里找 checkbox 并返回其坐标（不点击，让 Python 用真实鼠标点）
+    #         click_target = cf_page.run_js("""
+    #             // 1. opshadowRoot 内找 checkbox（YSbrowser 定制功能）
+    #             var allEls = document.querySelectorAll('*');
+    #             for (var i = 0; i < allEls.length; i++) {
+    #                 var sr = allEls[i].opshadowRoot;
+    #                 if (sr) {
+    #                     var cb = sr.querySelector('input[type="checkbox"]');
+    #                     if (cb) {
+    #                         var r = cb.getBoundingClientRect();
+    #                         return {type: 'checkbox_in_shadow', rect: {x: r.left, y: r.top, w: r.width, h: r.height}};
+    #                     }
+    #                 }
+    #             }
+
+    #             return null;
+    #         """)
+
+    #         if click_target:
+    #             rect = click_target['rect']
+    #             w, h = rect['w'], rect['h']
+    #             ox = random.gauss(w/2, w/6)   # 可调整标准差
+    #             oy = random.gauss(h/2, h/6)
+    #             ox = max(0, min(w, ox))       # 截断到 [0, w]
+    #             oy = max(0, min(h, oy))
+    #             cx = rect['x'] + ox
+    #             cy = rect['y'] + oy
+    #             logger.info(f"🖱️ - [{context}] 坐标({rect['x']:.0f}, {rect['y']:.0f}, {rect['w']:.0f}, {rect['h']:.0f})")
+    #             #logger.info(f"🖱️ - [{context}] 找到可点击元素: {click_target['type']}，点击坐标({cx:.0f}, {cy:.0f})")
+
+    #             # 模拟真实鼠标：用 cf_page.actions 在 iframe 上下文里点
+    #             try:
+    #                 actions = cf_page.actions
+    #                 start_x = rect['x'] + w * random.uniform(0.2, 0.8)
+    #                 start_y = rect['y'] + h * random.uniform(0.2, 0.8)
+    #                 logger.info(f"🖱️ - [{context}] 找到可点击元素: {click_target['type']}，起点坐标({start_x:.0f}, {start_y:.0f}),点击坐标({cx:.0f}, {cy:.0f})")
+    #                 actions.move_to((start_x, start_y))
+    #                 time.sleep(random.uniform(0.2, 0.5))
+    #                 actions.move(cx - start_x, cy - start_y)
+    #                 time.sleep(random.uniform(0.1, 0.3))
+    #                 actions.click()
+    #                 logger.info(f"🖱️ - [{context}] 真实鼠标点击完成")
+    #                 sleep(3000 + random.randint(0, 2000))
+    #                 return True
+    #             except Exception as e:
+    #                 logger.error(f"🖱️ - [{context}] 鼠标点击失败: {e}")
+    #                 return False
+    #         return True
+    #     except Exception as e:
+    #         logger.error(f"❌ - [{context}] opshadowRoot 访问失败: {e}")
+    #         return False
 
     def _build_session(self):
         cookies = self.page.cookies()
