@@ -597,6 +597,9 @@ class JisuSpider:
                     f.write(img_bytes) 
             else:
                 logger.warning(f"OCR: 未找到验证码图片元素")
+                self.page.refresh(ignore_cache=True)
+                sleep(3500)
+                return False
                 digit = ''.join(random.choices('0123456789', k=4))
                 input_elem = self.page.ele("@name:verify", timeout=5)
                 if not input_elem:
