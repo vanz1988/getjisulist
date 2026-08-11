@@ -855,7 +855,7 @@ class JisuSpider:
 
         captcha_code = ''.join(random.choices(common_chars, k=3))
 
-        if not self._pass_turnstile(TURNSTILE_URL, 3):
+        if not self._pass_turnstile(TURNSTILE_URL+captcha_code, 3):
             return False, "❌ Cloudflare 打码失败"
 
         if self.page:
