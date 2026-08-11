@@ -590,7 +590,42 @@ class JisuSpider:
         try:
             img_elem = self.page.ele('.mac_verify_img', timeout=3)
             if not img_elem:
-                logger.warning(f"OCR: 未找到验证码图片元素")
+                digit = ''.join(random.choices('0123456789', k=4))
+                input_elem = self.page.ele("@name:verify", timeout=5)
+                if not input_elem:
+                    logger.warning(f"OCR: 未找到验证码输入框")
+                    return False
+                logger.info(f"已找到输入框, type={input_elem.attr('type')}")
+
+                input_elem.clear(by_js=True)      # JS 直接设置 value=''
+                input_elem.input(digit, by_js=True)
+                logger.info(f"已输入验证码: {digit}")
+                sleep(500)
+
+                btn = self.page.ele('.verify_submit', timeout=5)
+                if btn:
+                    logger.info(f"已找到提交按钮, value={btn.attr('value')}")
+                    btn.click()
+                    logger.info(f"✅ 已点击提交按钮")
+                else:
+                    logger.warning(f"OCR: 未找到提交按钮，尝试JS点击")
+                    self.page.run_js(
+                        "var btns=document.querySelectorAll('.verify_submit'); if(btns.length) btns[0].click();")
+                    logger.info(f"✅ 已通过JS触发提交")
+
+                sleep(4500)
+
+                # 检查是否有 alert 弹窗
+                try:
+                    if self.page.states.has_alert:
+                        alert_text = self.page.handle_alert(accept=True)
+                        sleep(3000)
+                        logger.info(f"⚠️  - 捕获到弹窗提示: {alert_text}")
+                    else:
+                        logger.info(f"ℹ️  - 无alert弹窗")
+                except Exception as e:
+                    logger.warning(f"ℹ️  - 检查alert异常: {e}")
+                    
                 return False
 
             #img_path = '/tmp/captcha.png'
