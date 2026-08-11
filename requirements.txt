@@ -1,7 +1,4 @@
-cloakbrowser
 DrissionPage
-undetected-chromedriver
-selenium
 requests
 python-dotenv
 beautifulsoup4
