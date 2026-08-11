@@ -54,7 +54,7 @@ jobs:
           DISPLAY: ':99'
           HEADLESS: 'false'
         run: |
-          python newspider.py
+          python testddddocr.py
           
       - name: Keep only last 8 runs total
         env:
