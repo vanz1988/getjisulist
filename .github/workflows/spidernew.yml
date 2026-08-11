@@ -55,7 +55,7 @@ jobs:
           DISPLAY: ':99'
           HEADLESS: 'false'
         run: |
-          python testddddocr.py
+          python testkk.py
           
       - name: Keep only last 8 runs total
         env:
