@@ -2,6 +2,7 @@ import sys
 import numpy as np
 from PIL import Image, ImageEnhance, ImageOps
 import cv2
+import os
 os.environ['FLAGS_use_mkldnn'] = '0'
 import pytesseract
 from paddleocr import PaddleOCR
