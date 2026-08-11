@@ -3,4 +3,3 @@ requests
 python-dotenv
 beautifulsoup4
 numpy
-ddddocr
