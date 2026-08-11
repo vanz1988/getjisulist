@@ -36,6 +36,7 @@ jobs:
           pip install -r requirements.txt
           sudo apt-get update && sudo apt-get install -y xvfb xdotool tesseract-ocr tesseract-ocr-chi-sim
           pip install "numpy<2.0"  pytesseract  paddleocr  paddlepaddle
+          pip install --upgrade paddlepaddle
 
       - name: Download YSBrowser from my backup
         run: |
