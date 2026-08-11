@@ -35,8 +35,8 @@ jobs:
         run: |
           pip install -r requirements.txt
           sudo apt-get update && sudo apt-get install -y xvfb xdotool tesseract-ocr tesseract-ocr-chi-sim
-          pip install pytesseract  paddleocr  paddlepaddle
-          pip install --upgrade "paddlepaddle>=2.6"
+          pip install torch Pillow opencv-python pytesseract
+
 
       - name: Download YSBrowser from my backup
         run: |
@@ -54,7 +54,6 @@ jobs:
         env:
           DISPLAY: ':99'
           HEADLESS: 'false'
-          FLAGS_use_mkldnn: '0'
         run: |
           python testddddocr.py
           
