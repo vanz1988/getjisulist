@@ -15,10 +15,6 @@ from DrissionPage import ChromiumPage, ChromiumOptions
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 import sys
-from PIL import Image, ImageEnhance, ImageOps
-import cv2
-import pytesseract
-from paddleocr import PaddleOCR
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from testsomefunc import ocr_digits
 from DrissionPage.common import Keys
