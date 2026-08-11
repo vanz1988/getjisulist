@@ -34,7 +34,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
-          sudo apt-get update && sudo apt-get install -y xvfb xdotool tesseract-ocr tesseract-ocr-chi-sim
+          sudo apt-get update && sudo apt-get install -y xvfb xdotool tesseract-ocr
           pip install torch Pillow opencv-python pytesseract
 
 
