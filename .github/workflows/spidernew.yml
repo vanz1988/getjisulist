@@ -53,6 +53,7 @@ jobs:
         env:
           DISPLAY: ':99'
           HEADLESS: 'false'
+          FLAGS_use_mkldnn: '0'
         run: |
           python testddddocr.py
           
