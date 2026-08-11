@@ -22,7 +22,7 @@ from paddleocr import PaddleOCR
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from testsomefunc import ocr_digits
 from DrissionPage.common import Keys
-
+from urllib.parse import quote
 load_dotenv()
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
