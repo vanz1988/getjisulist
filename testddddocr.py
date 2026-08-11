@@ -15,6 +15,9 @@ from DrissionPage import ChromiumPage, ChromiumOptions
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 import sys
+
+os.environ['FLAGS_use_mkldnn'] = '0'
+
 from testsomefunc import ocr_digits
 from DrissionPage.common import Keys
 from urllib.parse import quote
