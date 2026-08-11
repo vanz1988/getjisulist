@@ -597,7 +597,7 @@ class JisuSpider:
                     f.write(img_bytes) 
             else:
                 logger.warning(f"OCR: 未找到验证码图片元素")
-                self.page.refresh(ignore_cache=True)
+                #self.page.refresh(ignore_cache=True)
                 url = self.page.url
                 self.page.close_current_tab()  # 关闭激活的标签页
                 sleep(1000)
