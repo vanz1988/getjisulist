@@ -681,7 +681,7 @@ class JisuSpider:
             sleep(3000)
             self._build_session()
             return True
-        maxnumattempts=30
+        maxnumattempts=10
         for i in range(maxnumattempts):
             logger.info(f"OCR验证码识别第 {i+1} 次尝试...")
             if self._handle_verify_ocr(i):
