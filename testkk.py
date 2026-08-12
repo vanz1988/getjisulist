@@ -737,7 +737,7 @@ class JisuSpider:
         #sleep(4000 + random.random() * 1000)
         #temp_tab.close()
         #sleep(1000)
-        self.page.listen.start('https://www.jisuzy.com/index.php/verify/index.html')
+        self.page.listen.start(HOST_URL+'/index.php/verify/index.html')
 
         self.page.get(url)
         sleep(4000 + random.random() * 1000)
