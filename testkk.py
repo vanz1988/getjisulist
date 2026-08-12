@@ -596,6 +596,11 @@ class JisuSpider:
                 with open(img_path, 'wb') as f:
                     f.write(img_bytes) 
             else:
+                input_elem = self.page.ele("@name:verify", timeout=5)
+                if input_elem:
+                    self.page.run_js("$('input[name=\"verify\"]').focus();")
+                    sleep(2000)
+                return False
                 logger.warning(f"OCR: 未找到验证码图片元素")
                 #url = self.page.url
                 #self.page.browser.close_tabs(self.page.tab_id)
